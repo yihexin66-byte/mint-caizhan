@@ -1,0 +1,131 @@
+import { reactive } from 'vue'
+import { LoginResult, User } from '@/types/models.uts'
+
+export type SessionState = {
+	token : string
+	userId : string
+	nickname : string
+	avatar : string
+	avatarUrl : string
+	isLoggedIn : boolean
+	ready : boolean
+}
+
+const STORAGE_TOKEN = 'mint_token'
+const STORAGE_UID = 'mint_uid'
+const STORAGE_NAME = 'mint_nickname'
+const STORAGE_AVATAR = 'mint_avatar'
+
+export const session = reactive({
+	token: '',
+	userId: '',
+	nickname: '',
+	avatar: '',
+	avatarUrl: '',
+	isLoggedIn: false,
+	ready: false
+} as SessionState)
+
+export function restoreSession() : void {
+	const token = uni.getStorageSync(STORAGE_TOKEN)
+	const uid = uni.getStorageSync(STORAGE_UID)
+	const name = uni.getStorageSync(STORAGE_NAME)
+	const avatar = uni.getStorageSync(STORAGE_AVATAR)
+	if (typeof token == 'string') {
+		const tokenValue = token as string
+		if (tokenValue.length > 0) {
+			session.token = tokenValue
+			session.userId = typeof uid == 'string' ? (uid as string) : ''
+			session.nickname = typeof name == 'string' ? (name as string) : ''
+			session.avatar = typeof avatar == 'string' ? (avatar as string) : ''
+			session.isLoggedIn = true
+		}
+	}
+	session.ready = true
+}
+
+export function applyLogin(result : LoginResult) : void {
+	session.token = result.token
+	session.userId = result.user.id
+	session.nickname = result.user.nickname
+	session.avatar = result.user.avatar
+	session.isLoggedIn = true
+	session.ready = true
+	uni.setStorageSync(STORAGE_TOKEN, result.token)
+	uni.setStorageSync(STORAGE_UID, result.user.id)
+	uni.setStorageSync(STORAGE_NAME, result.user.nickname)
+	uni.setStorageSync(STORAGE_AVATAR, result.user.avatar)
+	resolveAvatar()
+}
+
+export function applyProfile(nickname : string, avatar : string) : void {
+	session.nickname = nickname
+	session.avatar = avatar
+	uni.setStorageSync(STORAGE_NAME, nickname)
+	uni.setStorageSync(STORAGE_AVATAR, avatar)
+	if (avatar.length == 0) {
+		session.avatarUrl = ''
+	}
+}
+
+export async function resolveAvatar() : Promise<void> {
+	const fileID = session.avatar
+	if (fileID.length == 0) {
+		session.avatarUrl = ''
+		return
+	}
+	if (fileID.indexOf('http://') == 0 || fileID.indexOf('https://') == 0 ||
+		fileID.indexOf('blob:') == 0 || fileID.indexOf('wxfile://') == 0 ||
+		fileID.indexOf('data:') == 0) {
+		session.avatarUrl = fileID
+		return
+	}
+	try {
+		const cloud : any = uniCloud
+		const res : any = await cloud.getTempFileURL({ fileList: [fileID] })
+		const list = res.fileList as Array<any>
+		if (list != null && list.length > 0) {
+			const url = list[0].tempFileURL
+			session.avatarUrl = typeof url == 'string' ? (url as string) : ''
+		}
+	} catch (e) {
+		session.avatarUrl = ''
+	}
+}
+
+export function clearSession() : void {
+	session.token = ''
+	session.userId = ''
+	session.nickname = ''
+	session.avatar = ''
+	session.avatarUrl = ''
+	session.isLoggedIn = false
+	uni.removeStorageSync(STORAGE_TOKEN)
+	uni.removeStorageSync(STORAGE_UID)
+	uni.removeStorageSync(STORAGE_NAME)
+	uni.removeStorageSync(STORAGE_AVATAR)
+}
+
+export function currentUser() : User {
+	return {
+		id: session.userId,
+		nickname: session.nickname,
+		avatar: session.avatar
+	}
+}
+
+export function displayName(locale : string) : string {
+	if (session.nickname.length > 0) return session.nickname
+	return locale == 'en' ? 'Mint Friend' : 'Mint 用户'
+}
+
+export function enableDemoSession() : void {
+	if (session.isLoggedIn) return
+	session.token = 'demo-token'
+	session.userId = 'demo-user'
+	session.nickname = 'Alex'
+	session.avatar = ''
+	session.avatarUrl = ''
+	session.isLoggedIn = true
+	session.ready = true
+}

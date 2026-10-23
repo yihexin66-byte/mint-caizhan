@@ -1,0 +1,102 @@
+{
+  "mint-users": {
+    "data": [],
+    "index": [
+      {
+        "IndexName": "openid_unique",
+        "MgoKeySchema": {
+          "MgoIndexKeys": [
+            { "Name": "openid", "Direction": "1" }
+          ],
+          "MgoIsUnique": true
+        }
+      }
+    ]
+  },
+  "mint-transactions": {
+    "data": [],
+    "index": [
+      {
+        "IndexName": "openid_date",
+        "MgoKeySchema": {
+          "MgoIndexKeys": [
+            { "Name": "openid", "Direction": "1" },
+            { "Name": "date", "Direction": "-1" }
+          ],
+          "MgoIsUnique": false
+        }
+      },
+      {
+        "IndexName": "openid_source_debt",
+        "MgoKeySchema": {
+          "MgoIndexKeys": [
+            { "Name": "openid", "Direction": "1" },
+            { "Name": "sourceDebtId", "Direction": "1" }
+          ],
+          "MgoIsUnique": false
+        }
+      }
+    ]
+  },
+  "mint-debts": {
+    "data": [],
+    "index": [
+      {
+        "IndexName": "openid_settled_due",
+        "MgoKeySchema": {
+          "MgoIndexKeys": [
+            { "Name": "openid", "Direction": "1" },
+            { "Name": "settled", "Direction": "1" },
+            { "Name": "dueDate", "Direction": "1" }
+          ],
+          "MgoIsUnique": false
+        }
+      }
+    ]
+  },
+  "mint-budgets": {
+    "data": [],
+    "index": [
+      {
+        "IndexName": "openid_category_unique",
+        "MgoKeySchema": {
+          "MgoIndexKeys": [
+            { "Name": "openid", "Direction": "1" },
+            { "Name": "categoryId", "Direction": "1" }
+          ],
+          "MgoIsUnique": true
+        }
+      }
+    ]
+  },
+  "mint-settings": {
+    "data": [],
+    "index": [
+      {
+        "IndexName": "openid_unique",
+        "MgoKeySchema": {
+          "MgoIndexKeys": [
+            { "Name": "openid", "Direction": "1" }
+          ],
+          "MgoIsUnique": true
+        }
+      }
+    ]
+  },
+  "mint-alert-log": {
+    "data": [],
+    "index": [
+      {
+        "IndexName": "openid_month_budget_unique",
+        "MgoKeySchema": {
+          "MgoIndexKeys": [
+            { "Name": "openid", "Direction": "1" },
+            { "Name": "monthKey", "Direction": "1" },
+            { "Name": "budgetId", "Direction": "1" }
+          ],
+          "MgoIsUnique": true
+        }
+      }
+    ]
+  }
+}

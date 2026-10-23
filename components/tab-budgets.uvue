@@ -1,0 +1,1447 @@
+<template>
+	<view class="tab-view">
+		<view class="page-content">
+			<view class="topbar enter-fade">
+				<view class="head-left">
+					<text class="page-title">{{ t('budgets.title') }}</text>
+					<text class="page-sub">{{ t('budgets.subtitle') }}</text>
+				</view>
+				<view class="quick-add" @click="openNew">
+					<image class="quick-add-icon" src="/static/icons/ui-plus-ink.png" />
+					<text class="quick-add-text">{{ t('budgets.add') }}</text>
+				</view>
+			</view>
+
+			<view class="row justify-between items-center month-row enter-rise enter-d1">
+				<month-switch :label="monthTitle" @prev="prevMonth" @next="nextMonth" />
+				<view class="count-pill">
+					<text class="count-pill-text">{{ daysLeftText }}</text>
+				</view>
+			</view>
+
+			<view v-if="!ledger.loaded" class="loading-wrap">
+				<image class="logo-40" src="/static/icons/logo-light.png" />
+				<text class="loading-text">{{ ledger.error.length > 0 ? t('common.networkError') : t('common.loading') }}</text>
+			</view>
+
+			<view v-else>
+				<view class="hero-card enter-pop enter-d2">
+					<view class="hero-orbit"></view>
+					<view class="row justify-between items-center">
+						<view class="row items-center">
+							<view class="hero-dot"></view>
+							<text class="hero-label">{{ t('budgets.total') }}</text>
+						</view>
+						<view class="hero-edit" @click="openTotal">
+							<text class="hero-edit-text">{{ totalBudgetItem == null ? t('budgets.setTotal') : t('common.edit') }}</text>
+						</view>
+					</view>
+
+					<view v-if="totalBudgetItem != null">
+						<text class="hero-amount">{{ heroLimitText }}</text>
+						<view class="row items-center hero-amount-line">
+							<text class="hero-spent">{{ t('budgets.spent') }} {{ heroSpentText }}</text>
+							<view class="hero-sep"></view>
+							<text class="hero-left">{{ heroLeftText }}</text>
+						</view>
+						<view class="hero-track">
+							<view :class="totalOver ? 'hero-fill hero-fill-over' : 'hero-fill'" :style="'width: ' + totalWidth + '%'"></view>
+						</view>
+						<view class="row justify-between items-center hero-foot">
+							<text class="hero-foot-text">{{ totalPercentText }}</text>
+							<view class="row items-center">
+								<view class="hero-threshold-dot"></view>
+								<text class="hero-foot-text">{{ t('budgets.alertLine') }} {{ totalAlertAt }}%</text>
+							</view>
+						</view>
+					</view>
+
+					<view v-else class="hero-empty">
+						<text class="hero-empty-title">{{ t('budgets.noTotal') }}</text>
+						<view class="hero-cta" @click="openTotal">
+							<text class="hero-cta-text">{{ t('budgets.setTotal') }}</text>
+							<image class="hero-cta-icon" src="/static/icons/ui-right.png" />
+						</view>
+					</view>
+				</view>
+
+				<view v-if="alertItem != null" class="alert-banner alert-budget enter-rise enter-d3">
+					<view class="alert-icon">
+						<image class="icon-16" src="/static/icons/ui-bell-light.png" />
+					</view>
+					<view class="grow">
+						<text class="alert-title">{{ alertTitle }}</text>
+						<text class="alert-sub">{{ alertSub }}</text>
+					</view>
+					<view class="alert-close" @click="dismissTopAlert">
+						<image class="alert-close-icon" src="/static/icons/ui-close-light.png" />
+					</view>
+				</view>
+
+				<view class="section-header enter-rise enter-d3">
+					<view>
+						<text class="section-title">{{ t('budgets.categoryBudgets') }}</text>
+						<text class="section-sub">{{ categoryCountText }}</text>
+					</view>
+					<view class="legend-caption">
+						<view class="dot dot-mint"></view>
+						<text class="legend-caption-text">{{ t('budgets.used') }}</text>
+					</view>
+				</view>
+
+				<view v-if="budgetViews.length == 0" class="mt-2">
+					<empty-state
+						:title="t('budgets.empty')"
+						:subtitle="t('budgets.emptySub')"
+						:action="t('budgets.add')"
+						icon="/static/icons/logo-light.png"
+						@action="openNew"
+					/>
+				</view>
+
+				<view v-else>
+					<view v-for="(item, index) in budgetViews" :key="item.id" class="card budget-card enter-rise" :style="'animation-delay: ' + (150 + index * 35) + 'ms'" @click="openEditBudget(item.id)">
+						<view class="row items-center">
+							<view class="budget-icon" :style="'background-color: ' + item.color + '2E'">
+								<image class="budget-icon-img" :src="item.icon" />
+							</view>
+							<view class="grow budget-main">
+								<view class="row justify-between items-center">
+									<text class="budget-name">{{ item.name }}</text>
+									<text :class="item.over ? 'budget-percent budget-percent-over' : 'budget-percent'">{{ item.percentText }}</text>
+								</view>
+								<view class="row items-end budget-amounts">
+									<text class="budget-spent">{{ item.spentText }}</text>
+									<text class="budget-limit">/ {{ item.amountText }}</text>
+								</view>
+							</view>
+						</view>
+						<view class="budget-track">
+							<view class="budget-fill" :style="'width: ' + item.width + '%; background-color: ' + item.color"></view>
+						</view>
+						<view class="row justify-between items-center budget-foot">
+							<text :class="item.over ? 'budget-status budget-status-over' : 'budget-status'">{{ item.statusText }}</text>
+							<text class="budget-threshold">{{ t('budgets.alertLine') }} {{ item.alertAt }}%</text>
+						</view>
+					</view>
+				</view>
+
+				<view class="add-budget enter-rise enter-d5" @click="openNew">
+					<view class="add-budget-icon">
+						<image class="add-budget-icon-img" src="/static/icons/ui-plus-light.png" />
+					</view>
+					<text class="add-budget-text">{{ t('budgets.add') }}</text>
+				</view>
+
+				<view class="card notify-card enter-rise enter-d5">
+					<view class="notify-icon">
+						<image class="icon-18" src="/static/icons/ui-bell-light.png" />
+					</view>
+					<view class="grow notify-main">
+						<text class="notify-title">{{ t('budgets.notify') }}</text>
+						<text class="notify-sub">{{ t('budgets.notifyHint') }}</text>
+					</view>
+					<view :class="prefs.notifyWechat ? 'toggle toggle-on' : 'toggle'" @click="toggleNotify">
+						<view :class="prefs.notifyWechat ? 'knob knob-on' : 'knob'"></view>
+					</view>
+				</view>
+
+				<view class="tabbar-space"></view>
+			</view>
+		</view>
+
+		<view v-if="editorOpen" class="modal-mask" @click="closeEditor">
+			<view class="sheet budget-sheet" @click.stop>
+				<view class="sheet-handle"></view>
+				<view class="row justify-between items-center sheet-head">
+					<text class="sheet-title">{{ isEditingBudget ? t('budgets.edit') : t('budgets.new') }}</text>
+					<view v-if="isEditingBudget" class="sheet-trash" @click="askDeleteBudget">
+						<image class="icon-16" src="/static/icons/ui-trash-light.png" />
+					</view>
+				</view>
+
+				<view v-if="!isEditingBudget" class="editor-field">
+					<text class="field-label">{{ t('budgets.scope') }}</text>
+					<view class="row scope-row">
+						<view :class="scope == 'total' ? 'chip chip-active scope-chip' : 'chip scope-chip'" @click="setScope('total')">
+							<text :class="scope == 'total' ? 'chip-text chip-text-active' : 'chip-text'">{{ t('budgets.totalScope') }}</text>
+						</view>
+						<view :class="scope == 'category' ? 'chip chip-active scope-chip' : 'chip scope-chip'" @click="setScope('category')">
+							<text :class="scope == 'category' ? 'chip-text chip-text-active' : 'chip-text'">{{ t('budgets.categoryScope') }}</text>
+						</view>
+					</view>
+				</view>
+
+				<view v-if="scope == 'category'" class="editor-field">
+					<text class="field-label">{{ t('budgets.categoryScope') }}</text>
+					<view class="row wrap category-pick-row">
+						<view
+							v-for="cat in budgetCategories"
+							:key="cat.id"
+							:class="editorCategoryId == cat.id ? 'category-pick category-pick-active' : 'category-pick'"
+							@click="pickCategory(cat.id)"
+						>
+							<view class="category-pick-dot" :style="'background-color: ' + cat.color"></view>
+							<text :class="editorCategoryId == cat.id ? 'category-pick-text category-pick-text-active' : 'category-pick-text'">{{ categoryName(cat.id, prefs.locale) }}</text>
+						</view>
+					</view>
+				</view>
+
+				<view class="editor-field">
+					<text class="field-label">{{ t('budgets.amount') }}</text>
+					<view class="amount-box">
+						<text class="amount-symbol">{{ editorSymbol }}</text>
+						<input
+							class="amount-input"
+							type="digit"
+							:value="editorAmount"
+							placeholder="0"
+							placeholder-class="amount-placeholder"
+							@input="onAmountInput"
+						/>
+					</view>
+					<view class="row wrap currency-row">
+						<view
+							v-for="item in currencies"
+							:key="item.code"
+							:class="editorCurrency == item.code ? 'currency-pick currency-pick-active' : 'currency-pick'"
+							@click="pickCurrency(item.code)"
+						>
+							<text :class="editorCurrency == item.code ? 'currency-pick-text currency-pick-text-active' : 'currency-pick-text'">{{ item.code }}</text>
+						</view>
+					</view>
+				</view>
+
+				<view class="editor-field">
+					<text class="field-label">{{ t('budgets.threshold') }}</text>
+					<view class="row threshold-row">
+						<view
+							v-for="value in thresholds"
+							:key="value"
+							:class="editorAlert == value ? 'threshold-chip threshold-chip-active' : 'threshold-chip'"
+							@click="pickThreshold(value)"
+						>
+							<text :class="editorAlert == value ? 'threshold-text threshold-text-active' : 'threshold-text'">{{ value }}%</text>
+						</view>
+					</view>
+				</view>
+
+				<view class="btn btn-mint save-btn" hover-class="pressed" @click="saveEditor">
+					<text class="btn-mint-text">{{ t('budgets.save') }}</text>
+				</view>
+				<view class="sheet-bottom"></view>
+			</view>
+		</view>
+
+		<view v-if="deleteOpen" class="modal-mask modal-mask-center">
+			<view class="dialog">
+				<text class="dialog-title">{{ t('budgets.deleteTitle') }}</text>
+				<text class="dialog-msg">{{ t('budgets.deleteMsg') }}</text>
+				<view class="row dialog-actions">
+					<view class="dialog-btn dialog-btn-ghost" @click="closeDelete">
+						<text class="dialog-btn-ghost-text">{{ t('common.cancel') }}</text>
+					</view>
+					<view class="dialog-btn dialog-btn-danger" @click="confirmDeleteBudget">
+						<text class="dialog-btn-danger-text">{{ t('common.delete') }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, onMounted, ref, watch } from 'vue'
+	import MonthSwitch from '@/components/month-switch.uvue'
+	import EmptyState from '@/components/empty-state.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs, setNotifyWechat } from '@/stores/prefs.uts'
+	import {
+		ledger,
+		ensureLoaded,
+		setMonth,
+		findBudget,
+		saveBudgetItem,
+		removeBudget,
+		dismissAlert,
+		syncSettings,
+		syncSubscription
+	} from '@/stores/ledger.uts'
+	import {
+		budgetPercent,
+		budgetSpent,
+		totalBudget
+	} from '@/utils/stats.uts'
+	import { addMonthsKey, daysInMonth, monthLabel, thisMonthKey } from '@/utils/date.uts'
+	import { formatCurrency, formatPercent, parseAmount, trimAmountInput } from '@/utils/money.uts'
+	import { categoryById, categoryName, categoryIconPath, EXPENSE_CATEGORIES } from '@/constants/categories.uts'
+	import { CURRENCIES, currencyByCode } from '@/constants/currencies.uts'
+	import { Budget, BudgetAlert, BudgetInput, CategoryDef, CurrencyDef } from '@/types/models.uts'
+	import { DEFAULT_ALERT_AT, SUBSCRIBE_TEMPLATE_ID } from '@/constants/config.uts'
+
+	defineOptions({
+		styleIsolation: 'app'
+	})
+
+	type BudgetView = {
+		id : string
+		name : string
+		color : string
+		icon : string
+		spentText : string
+		amountText : string
+		percentText : string
+		statusText : string
+		alertAt : number
+		width : number
+		over : boolean
+	}
+
+	onMounted(() => {
+		ensureLoaded()
+		if (ledger.loaded) animateTotalBudget()
+	})
+
+	const editorOpen = ref(false)
+	const deleteOpen = ref(false)
+	const editingId = ref('')
+	const scope = ref('category')
+	const editorCategoryId = ref('food')
+	const editorAmount = ref('')
+	const editorCurrency = ref(prefs.baseCurrency)
+	const editorAlert = ref(DEFAULT_ALERT_AT)
+
+	const currencies = computed<Array<CurrencyDef>>(() => {
+		return CURRENCIES
+	})
+
+	const thresholds = computed<Array<number>>(() => {
+		const list : Array<number> = [70, 80, 90, 100]
+		return list
+	})
+
+	const monthTitle = computed(() : string => {
+		return monthLabel(ledger.currentMonth, prefs.locale)
+	})
+
+	const totalBudgetItem = computed<Budget | null>(() => {
+		return totalBudget(ledger.budgets)
+	})
+
+	const totalSpentValue = computed(() : number => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return 0
+		return budgetSpent(budget, ledger.transactions, ledger.currentMonth)
+	})
+
+	const totalPercentValue = computed(() : number => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return 0
+		return budgetPercent(budget, ledger.transactions, ledger.currentMonth)
+	})
+
+	const totalLimitText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		return formatCurrency(budget.amount, budget.currency, prefs.locale)
+	})
+
+	const totalSpentText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		return formatCurrency(totalSpentValue.value, budget.currency, prefs.locale)
+	})
+
+		const totalLeftText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		const left = budget.amount - totalSpentValue.value
+		if (left < 0) {
+			return t('budgets.over') + ' ' + formatCurrency(Math.abs(left), budget.currency, prefs.locale)
+		}
+		return t('budgets.remaining') + ' ' + formatCurrency(left, budget.currency, prefs.locale)
+	})
+
+	const animTotalLimit = ref(0)
+	const animTotalSpent = ref(0)
+	let totalCountToken = 0
+
+	const totalLimitValue = computed(() : number => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return 0
+		return budget.amount
+	})
+
+	const heroLimitText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		return formatCurrency(animTotalLimit.value, budget.currency, prefs.locale)
+	})
+
+	const heroSpentText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		return formatCurrency(animTotalSpent.value, budget.currency, prefs.locale)
+	})
+
+	const heroLeftText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		const left = animTotalLimit.value - animTotalSpent.value
+		if (left < 0) {
+			return t('budgets.over') + ' ' + formatCurrency(Math.abs(left), budget.currency, prefs.locale)
+		}
+		return t('budgets.remaining') + ' ' + formatCurrency(left, budget.currency, prefs.locale)
+	})
+
+	function animateTotalBudget() : void {
+		const budget = totalBudgetItem.value
+		if (budget == null) return
+		const targetLimit = budget.amount
+		const targetSpent = totalSpentValue.value
+		const fromLimit = animTotalLimit.value
+		const fromSpent = animTotalSpent.value
+		totalCountToken = totalCountToken + 1
+		const token = totalCountToken
+		const started = Date.now()
+		const step = () : void => {
+			if (token != totalCountToken) return
+			let progress = (Date.now() - started) / 760
+			if (progress > 1) progress = 1
+			const eased = 1 - Math.pow(1 - progress, 3)
+			animTotalLimit.value = fromLimit + (targetLimit - fromLimit) * eased
+			animTotalSpent.value = fromSpent + (targetSpent - fromSpent) * eased
+			if (progress < 1) {
+				setTimeout(step, 32)
+			}
+		}
+		step()
+	}
+
+	watch(() => ledger.loaded, (_value) => {
+		if (ledger.loaded) animateTotalBudget()
+	})
+
+	watch(() => ledger.currentMonth, (_value) => {
+		if (ledger.loaded) animateTotalBudget()
+	})
+
+	watch(() => totalLimitValue.value, (_value) => {
+		if (ledger.loaded) animateTotalBudget()
+	})
+
+	watch(() => totalSpentValue.value, (_value) => {
+		if (ledger.loaded) animateTotalBudget()
+	})
+
+	const totalPercentText = computed(() : string => {
+		return formatPercent(totalPercentValue.value) + ' ' + t('budgets.used')
+	})
+
+	const totalWidth = computed(() : number => {
+		const pct = Math.round(totalPercentValue.value)
+		return pct > 100 ? 100 : (pct < 2 ? 2 : pct)
+	})
+
+	const totalOver = computed(() : boolean => {
+		return totalPercentValue.value > 100
+	})
+
+	const totalAlertAt = computed(() : number => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return DEFAULT_ALERT_AT
+		return budget.alertAt
+	})
+
+	const daysLeftText = computed(() : string => {
+		if (ledger.currentMonth != thisMonthKey()) {
+			return monthTitle.value
+		}
+		const total = daysInMonth(ledger.currentMonth)
+		const left = total - new Date().getDate() + 1
+		if (prefs.locale == 'en') {
+			return left.toString() + ' days left'
+		}
+		return t('budgets.daysLeft') + ' ' + left.toString() + ' ' + t('budgets.daysUnit')
+	})
+
+	const categoryBudgets = computed(() => {
+		const list : Array<Budget> = []
+		for (let i = 0; i < ledger.budgets.length; i++) {
+			if (ledger.budgets[i].categoryId != 'all') list.push(ledger.budgets[i])
+		}
+		return list
+	})
+
+	const categoryCountText = computed(() : string => {
+		return categoryBudgets.value.length.toString() + ' ' + t('budgets.categoryBudgets')
+	})
+
+	const budgetViews = computed<Array<BudgetView>>(() => {
+		const result : Array<BudgetView> = []
+		for (let i = 0; i < categoryBudgets.value.length; i++) {
+			const budget = categoryBudgets.value[i]
+			const cat = categoryById(budget.categoryId)
+			const spent = budgetSpent(budget, ledger.transactions, ledger.currentMonth)
+			const pct = budgetPercent(budget, ledger.transactions, ledger.currentMonth)
+			let status = t('budgets.healthy')
+			if (pct >= 100) {
+				status = t('budgets.overBudget')
+			} else if (pct >= budget.alertAt) {
+				status = t('budgets.nearBudget')
+			}
+			result.push({
+				id: budget.id,
+				name: categoryName(budget.categoryId, prefs.locale),
+				color: cat.color,
+				icon: categoryIconPath(budget.categoryId),
+				spentText: formatCurrency(spent, budget.currency, prefs.locale),
+				amountText: formatCurrency(budget.amount, budget.currency, prefs.locale),
+				percentText: formatPercent(pct),
+				statusText: status,
+				alertAt: budget.alertAt,
+				width: pct > 100 ? 100 : (pct < 2 ? 2 : pct),
+				over: pct >= 100
+			})
+		}
+		return result
+	})
+
+	const budgetCategories = computed<Array<CategoryDef>>(() => {
+		const list : Array<CategoryDef> = []
+		for (let i = 0; i < EXPENSE_CATEGORIES.length; i++) {
+			if (EXPENSE_CATEGORIES[i].id != 'debt_pay') list.push(EXPENSE_CATEGORIES[i])
+		}
+		return list
+	})
+
+	const isEditingBudget = computed(() : boolean => {
+		return editingId.value.length > 0
+	})
+
+	const editorSymbol = computed(() : string => {
+		return currencyByCode(editorCurrency.value).symbol
+	})
+
+	const alertItem = computed<BudgetAlert | null>(() => {
+		if (ledger.alerts.length == 0) return null
+		return ledger.alerts[0]
+	})
+
+	const alertTitle = computed(() : string => {
+		const item = alertItem.value
+		if (item == null) return ''
+		const name = item.categoryId == 'all' ? t('budgets.totalName') : categoryName(item.categoryId, prefs.locale)
+		return t('home.alertBanner') + ' · ' + name
+	})
+
+	const alertSub = computed(() : string => {
+		const item = alertItem.value
+		if (item == null) return ''
+		const prefix = item.percent >= 100 ? t('alert.over') : t('alert.near')
+		return prefix + ' ' + formatPercent(item.percent) + ' · ' + formatCurrency(item.spent, item.currency, prefs.locale)
+	})
+
+	function prevMonth() : void {
+		setMonth(addMonthsKey(ledger.currentMonth, -1))
+	}
+
+	function nextMonth() : void {
+		setMonth(addMonthsKey(ledger.currentMonth, 1))
+	}
+
+	function resetEditor() : void {
+		editingId.value = ''
+		scope.value = 'category'
+		editorAmount.value = ''
+		editorCurrency.value = prefs.baseCurrency
+		editorAlert.value = DEFAULT_ALERT_AT
+		editorCategoryId.value = budgetCategories.value[0].id
+	}
+
+	function openNew() : void {
+		resetEditor()
+		for (let i = 0; i < budgetCategories.value.length; i++) {
+			const cat = budgetCategories.value[i]
+			let used = false
+			for (let j = 0; j < ledger.budgets.length; j++) {
+				if (ledger.budgets[j].categoryId == cat.id) used = true
+			}
+			if (!used) {
+				editorCategoryId.value = cat.id
+				editorOpen.value = true
+				return
+			}
+		}
+		editorOpen.value = true
+	}
+
+	function openTotal() : void {
+		const budget = totalBudgetItem.value
+		if (budget != null) {
+			openEditBudget(budget.id)
+			return
+		}
+		resetEditor()
+		scope.value = 'total'
+		editorCategoryId.value = 'all'
+		editorOpen.value = true
+	}
+
+	function openEditBudget(id : string) : void {
+		const budget = findBudget(id)
+		if (budget == null) return
+		editingId.value = budget.id
+		scope.value = budget.categoryId == 'all' ? 'total' : 'category'
+		editorCategoryId.value = budget.categoryId
+		editorAmount.value = trimAmountInput(budget.amount.toString())
+		editorCurrency.value = budget.currency
+		editorAlert.value = budget.alertAt
+		editorOpen.value = true
+	}
+
+	function closeEditor() : void {
+		editorOpen.value = false
+	}
+
+	function setScope(next : string) : void {
+		scope.value = next
+		if (next == 'total') {
+			editorCategoryId.value = 'all'
+		} else if (editorCategoryId.value == 'all') {
+			editorCategoryId.value = budgetCategories.value[0].id
+		}
+	}
+
+	function pickCategory(id : string) : void {
+		editorCategoryId.value = id
+	}
+
+	function onAmountInput(event : UniInputEvent) : void {
+		editorAmount.value = trimAmountInput(event.detail.value)
+	}
+
+	function pickCurrency(code : string) : void {
+		editorCurrency.value = code
+	}
+
+	function pickThreshold(value : number) : void {
+		editorAlert.value = value
+	}
+
+	async function saveEditor() : Promise<void> {
+		const amount = parseAmount(editorAmount.value)
+		if (amount <= 0) {
+			uni.showToast({
+				title: t('recordEdit.validationAmount'),
+				icon: 'none'
+			})
+			return
+		}
+		let targetId = editingId.value
+		const targetCategory = scope.value == 'total' ? 'all' : editorCategoryId.value
+		if (targetId.length == 0) {
+			for (let i = 0; i < ledger.budgets.length; i++) {
+				if (ledger.budgets[i].categoryId == targetCategory) {
+					targetId = ledger.budgets[i].id
+					break
+				}
+			}
+		}
+		const input : BudgetInput = {
+			id: targetId,
+			categoryId: targetCategory,
+			amount: amount,
+			currency: editorCurrency.value,
+			alertAt: editorAlert.value
+		}
+		try {
+			await saveBudgetItem(input)
+			editorOpen.value = false
+			uni.showToast({
+				title: t('budgets.saved'),
+				icon: 'success'
+			})
+		} catch (e) {
+			uni.showModal({
+				content: t('common.saveFailed'),
+				showCancel: false
+			})
+		}
+	}
+
+	function askDeleteBudget() : void {
+		deleteOpen.value = true
+	}
+
+	function closeDelete() : void {
+		deleteOpen.value = false
+	}
+
+	async function confirmDeleteBudget() : Promise<void> {
+		const id = editingId.value
+		deleteOpen.value = false
+		if (id.length == 0) return
+		try {
+			await removeBudget(id)
+			editorOpen.value = false
+		} catch (e) {
+			uni.showModal({
+				content: t('common.deleteFailed'),
+				showCancel: false
+			})
+		}
+	}
+
+	function dismissTopAlert() : void {
+		const item = alertItem.value
+		if (item != null) dismissAlert(item.budgetId)
+	}
+
+	function toggleNotify() : void {
+		if (prefs.notifyWechat) {
+			setNotifyWechat(false)
+			syncSettings()
+			uni.showToast({
+				title: t('budgets.notifyOff'),
+				icon: 'none'
+			})
+			return
+		}
+		// #ifdef MP-WEIXIN
+		if (SUBSCRIBE_TEMPLATE_ID.length == 0) {
+			uni.showModal({
+				title: t('budgets.templateMissing'),
+				content: t('budgets.templateMissingMsg'),
+				showCancel: false
+			})
+			return
+		}
+		const ids : Array<string> = [SUBSCRIBE_TEMPLATE_ID]
+		wx.requestSubscribeMessage({
+			tmplIds: ids,
+			success: (res) => {
+				const payload = JSON.parse<UTSJSONObject>(JSON.stringify(res))
+				const answer = payload == null ? null : payload.getString(SUBSCRIBE_TEMPLATE_ID)
+				const accepted = answer == 'accept'
+				setNotifyWechat(accepted)
+				syncSubscription(SUBSCRIBE_TEMPLATE_ID, accepted)
+				syncSettings()
+				uni.showToast({
+					title: accepted ? t('budgets.notifyOn') : t('budgets.notifyDenied'),
+					icon: 'none'
+				})
+			},
+			fail: (_ : UniError) => {
+				uni.showToast({
+					title: t('budgets.notifyDenied'),
+					icon: 'none'
+				})
+			}
+		})
+		// #endif
+		// #ifndef MP-WEIXIN
+		uni.showToast({
+			title: t('budgets.notifyNeedsMp'),
+			icon: 'none'
+		})
+		// #endif
+	}
+</script>
+
+<style>
+	.tab-view {
+		flex-direction: column;
+		position: relative;
+	}
+	.topbar {
+		padding-top: 2px;
+		padding-bottom: 2px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.head-left {
+		flex-direction: column;
+	}
+
+	.page-title {
+		font-size: 27px;
+		font-weight: 800;
+		letter-spacing: -0.8px;
+		color: #F2F6F1;
+	}
+
+	.page-sub {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		margin-top: 5px;
+	}
+
+	.quick-add {
+		height: 38px;
+		border-radius: 14px;
+		background-color: #A9EDCB;
+		background-image: linear-gradient(160deg, #D6F8E6 0%, #A9EDCB 52%, #8FE3BC 100%);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 13px;
+		padding-right: 14px;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 18px rgba(143,227,188,0.28);
+	}
+
+	.quick-add-icon {
+		width: 15px;
+		height: 15px;
+	}
+
+	.quick-add-text {
+		font-size: 12px;
+		font-weight: 700;
+		color: #0B2117;
+		margin-left: 5px;
+	}
+
+	.month-row {
+		margin-top: 16px;
+	}
+
+	.count-pill {
+		height: 28px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.06);
+		padding-left: 11px;
+		padding-right: 11px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.10);
+	}
+
+	.count-pill-text {
+		font-size: 10px;
+		color: rgba(234,242,237,0.55);
+		font-weight: 600;
+	}
+
+	.hero-card {
+		margin-top: 12px;
+		background-color: rgba(17,24,20,0.64);
+		background-image: radial-gradient(125% 115% at 94% -12%, rgba(123,231,191,0.26) 0%, rgba(123,231,191,0.07) 42%, rgba(255,255,255,0.02) 68%, rgba(255,255,255,0.055) 100%);
+		border-radius: 28px;
+		padding: 20px;
+		overflow: hidden;
+		position: relative;
+		flex-direction: column;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.18), inset 0 1px 0 rgba(255,255,255,0.24), 0 22px 48px rgba(0,0,0,0.50);
+	}
+
+	.hero-orbit {
+		position: absolute;
+		width: 190px;
+		height: 190px;
+		border-radius: 95px;
+		border-width: 1px;
+		border-style: solid;
+		border-color: rgba(244, 240, 232, 0.09);
+		right: -70px;
+		top: -80px;
+	}
+
+	.hero-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 3px;
+		background-color: #7BE7BF;
+		margin-right: 7px;
+	}
+
+	.hero-label {
+		font-size: 11px;
+		color: rgba(244, 240, 232, 0.62);
+	}
+
+	.hero-edit {
+		height: 26px;
+		border-radius: 13px;
+		background-color: rgba(244, 240, 232, 0.12);
+		padding-left: 10px;
+		padding-right: 10px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+	}
+
+	.hero-edit-text {
+		font-size: 9px;
+		color: rgba(169,237,203,0.90);
+		font-weight: 600;
+	}
+
+	.hero-amount {
+		font-size: 34px;
+		font-weight: 800;
+		color: #F4F1E9;
+		letter-spacing: -1.2px;
+		margin-top: 13px;
+	}
+
+	.hero-amount-line {
+		margin-top: 6px;
+	}
+
+	.hero-spent {
+		font-size: 10px;
+		color: rgba(244, 240, 232, 0.55);
+	}
+
+	.hero-sep {
+		width: 3px;
+		height: 3px;
+		border-radius: 2px;
+		background-color: rgba(244, 240, 232, 0.25);
+		margin-left: 8px;
+		margin-right: 8px;
+	}
+
+	.hero-left {
+		font-size: 10px;
+		color: #A9EDCB;
+	}
+
+	.hero-track {
+		height: 8px;
+		border-radius: 4px;
+		background-color: rgba(244, 240, 232, 0.12);
+		overflow: hidden;
+		margin-top: 15px;
+	}
+
+	.hero-fill {
+		height: 8px;
+		border-radius: 4px;
+		background-color: #6FE0B2;
+	}
+
+	.hero-fill-over {
+		background-color: #F0A06A;
+	}
+
+	.hero-foot {
+		margin-top: 9px;
+	}
+
+	.hero-foot-text {
+		font-size: 9px;
+		color: rgba(244, 240, 232, 0.48);
+	}
+
+	.hero-threshold-dot {
+		width: 4px;
+		height: 4px;
+		border-radius: 2px;
+		background-color: rgba(244, 240, 232, 0.3);
+		margin-right: 5px;
+	}
+
+	.hero-empty {
+		flex-direction: column;
+		margin-top: 16px;
+	}
+
+	.hero-empty-title {
+		font-size: 16px;
+		font-weight: 650;
+		color: #F4F1E9;
+	}
+
+	.hero-cta {
+		height: 38px;
+		border-radius: 12px;
+		background-color: #A9EDCB;
+		background-image: linear-gradient(160deg, #D6F8E6 0%, #A9EDCB 52%, #8FE3BC 100%);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 14px;
+		padding-right: 12px;
+		align-self: flex-start;
+		margin-top: 12px;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 18px rgba(143,227,188,0.24);
+	}
+
+	.hero-cta-text {
+		font-size: 11px;
+		font-weight: 700;
+		color: #0B2117;
+	}
+
+	.hero-cta-icon {
+		width: 12px;
+		height: 12px;
+		margin-left: 5px;
+		opacity: 0.6;
+	}
+
+	.alert-budget {
+		margin-top: 12px;
+	}
+
+	.alert-title {
+		font-size: 11px;
+		font-weight: 700;
+		color: #F3B07C;
+	}
+
+	.alert-sub {
+		font-size: 10px;
+		color: #E9A879;
+		margin-top: 3px;
+	}
+
+	.alert-close {
+		width: 26px;
+		height: 26px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.alert-close-icon {
+		width: 12px;
+		height: 12px;
+		opacity: 0.5;
+	}
+
+	.section-header {
+		margin-top: 20px;
+		margin-bottom: 9px;
+		padding-left: 4px;
+		padding-right: 4px;
+		flex-direction: row;
+		align-items: flex-end;
+		justify-content: space-between;
+	}
+
+	.section-title {
+		font-size: 16px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.section-sub {
+		font-size: 11px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+	}
+
+	.legend-caption {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.legend-caption-text {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-left: 5px;
+	}
+
+	.budget-card {
+		margin-bottom: 10px;
+		padding: 15px 16px 13px 16px;
+	}
+
+	.budget-icon {
+		width: 42px;
+		height: 42px;
+		border-radius: 14px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), inset 0 1px 0 rgba(255,255,255,0.16);
+	}
+
+	.budget-icon-img {
+		width: 21px;
+		height: 21px;
+	}
+
+	.budget-main {
+		margin-left: 12px;
+		flex-direction: column;
+	}
+
+	.budget-name {
+		font-size: 13px;
+		font-weight: 700;
+		color: #F2F6F1;
+	}
+
+	.budget-percent {
+		font-size: 12px;
+		font-weight: 750;
+		color: #8FE3BC;
+	}
+
+	.budget-percent-over {
+		color: #F08A70;
+	}
+
+	.budget-amounts {
+		margin-top: 3px;
+	}
+
+	.budget-spent {
+		font-size: 10px;
+		color: rgba(234,242,237,0.56);
+	}
+
+	.budget-limit {
+		font-size: 10px;
+		color: rgba(234,242,237,0.32);
+		margin-left: 4px;
+	}
+
+	.budget-track {
+		height: 5px;
+		border-radius: 3px;
+		background-color: rgba(255,255,255,0.08);
+		overflow: hidden;
+		margin-top: 12px;
+	}
+
+	.budget-fill {
+		height: 5px;
+		border-radius: 3px;
+	}
+
+	.budget-foot {
+		margin-top: 7px;
+	}
+
+	.budget-status {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+	}
+
+	.budget-status-over {
+		color: #F0A088;
+	}
+
+	.budget-threshold {
+		font-size: 9px;
+		color: rgba(234,242,237,0.32);
+	}
+
+	.add-budget {
+		height: 54px;
+		border-radius: 18px;
+		border-width: 1px;
+		border-style: dashed;
+		border-color: rgba(255,255,255,0.18);
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.add-budget-icon {
+		width: 24px;
+		height: 24px;
+		border-radius: 8px;
+		background-color: rgba(123,231,191,0.12);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.add-budget-icon-img {
+		width: 12px;
+		height: 12px;
+	}
+
+	.add-budget-text {
+		font-size: 12px;
+		font-weight: 650;
+		color: rgba(234,242,237,0.55);
+		margin-left: 8px;
+	}
+
+	.notify-card {
+		margin-top: 14px;
+		flex-direction: row;
+		align-items: center;
+		padding: 15px 16px;
+	}
+
+	.notify-icon {
+		width: 38px;
+		height: 38px;
+		border-radius: 12px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.notify-main {
+		margin-left: 12px;
+		flex-direction: column;
+	}
+
+	.notify-title {
+		font-size: 12px;
+		font-weight: 700;
+		color: #F2F6F1;
+	}
+
+	.notify-sub {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+		line-height: 14px;
+	}
+
+	.toggle {
+		width: 42px;
+		height: 24px;
+		border-radius: 12px;
+		background-color: rgba(255,255,255,0.10);
+		padding: 3px;
+		flex-direction: row;
+		align-items: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10);
+	}
+
+	.toggle-on {
+		background-color: #6FD9A9;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+	}
+
+	.knob {
+		width: 18px;
+		height: 18px;
+		border-radius: 9px;
+		background-color: #F4F1E9;
+		box-shadow: 0 2px 5px rgba(0,0,0,0.28);
+	}
+
+	.knob-on {
+		margin-left: 18px;
+	}
+
+	.sheet-head {
+		margin-bottom: 4px;
+	}
+
+	.sheet-title {
+		font-size: 18px;
+		font-weight: 800;
+		color: #F2F6F1;
+	}
+
+	.sheet-trash {
+		width: 30px;
+		height: 30px;
+		border-radius: 10px;
+		background-color: rgba(240,110,86,0.12);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.editor-field {
+		margin-top: 14px;
+		flex-direction: column;
+	}
+
+	.scope-row {
+		flex-direction: row;
+	}
+
+	.scope-chip {
+		margin-right: 8px;
+	}
+
+	.category-pick-row {
+		flex-direction: row;
+	}
+
+	.category-pick {
+		height: 32px;
+		border-radius: 11px;
+		background-color: rgba(255,255,255,0.06);
+		padding-left: 11px;
+		padding-right: 11px;
+		flex-direction: row;
+		align-items: center;
+		margin-right: 7px;
+		margin-bottom: 7px;
+	}
+
+	.category-pick-active {
+		background-color: rgba(123,231,191,0.14);
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.24);
+	}
+
+	.category-pick-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 3px;
+	}
+
+	.category-pick-text {
+		font-size: 11px;
+		color: rgba(234,242,237,0.64);
+		margin-left: 6px;
+	}
+
+	.category-pick-text-active {
+		color: #A9EDCB;
+		font-weight: 650;
+	}
+
+	.amount-box {
+		height: 56px;
+		border-radius: 15px;
+		background-color: rgba(255,255,255,0.06);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 14px;
+		padding-right: 14px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.12);
+	}
+
+	.amount-symbol {
+		font-size: 18px;
+		font-weight: 700;
+		color: rgba(234,242,237,0.56);
+		margin-right: 6px;
+	}
+
+	.amount-input {
+		flex: 1;
+		height: 56px;
+		font-size: 24px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.amount-placeholder {
+		color: rgba(234,242,237,0.26);
+	}
+
+	.currency-row {
+		flex-direction: row;
+		margin-top: 9px;
+	}
+
+	.currency-pick {
+		height: 28px;
+		border-radius: 10px;
+		background-color: rgba(255,255,255,0.06);
+		padding-left: 10px;
+		padding-right: 10px;
+		align-items: center;
+		justify-content: center;
+		margin-right: 6px;
+	}
+
+	.currency-pick-active {
+		background-color: rgba(123,231,191,0.14);
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.24);
+	}
+
+	.currency-pick-text {
+		font-size: 10px;
+		font-weight: 600;
+		color: rgba(234,242,237,0.55);
+	}
+
+	.currency-pick-text-active {
+		color: #A9EDCB;
+	}
+
+	.threshold-row {
+		flex-direction: row;
+	}
+
+	.threshold-chip {
+		width: 58px;
+		height: 34px;
+		border-radius: 11px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+		margin-right: 8px;
+	}
+
+	.threshold-chip-active {
+		background-color: #A9EDCB;
+	}
+
+	.threshold-text {
+		font-size: 11px;
+		font-weight: 600;
+		color: rgba(234,242,237,0.55);
+	}
+
+	.threshold-text-active {
+		color: #0B2117;
+		font-weight: 750;
+	}
+
+	.save-btn {
+		margin-top: 20px;
+		border-radius: 16px;
+	}
+
+	.sheet-bottom {
+		height: 6px;
+	}
+
+	.dialog-title {
+		font-size: 17px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.dialog-msg {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		line-height: 19px;
+		margin-top: 8px;
+	}
+
+	.dialog-actions {
+		margin-top: 20px;
+	}
+
+	.dialog-btn {
+		flex: 1;
+		height: 46px;
+		border-radius: 14px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dialog-btn-ghost {
+		background-color: rgba(255,255,255,0.06);
+	}
+
+	.dialog-btn-ghost-text {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.dialog-btn-danger {
+		background-color: rgba(240,110,86,0.12);
+		margin-left: 10px;
+	}
+
+	.dialog-btn-danger-text {
+		font-size: 13px;
+		font-weight: 700;
+		color: #F08A70;
+	}
+
+	.loading-text {
+		font-size: 12px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 14px;
+	}
+</style>

@@ -1,0 +1,758 @@
+<template>
+	<view class="tab-view">
+		<view class="page-content">
+			<view class="topbar enter-fade">
+				<view class="head-left">
+					<text class="page-title">{{ t('stats.title') }}</text>
+					<text class="page-sub">{{ t('stats.subtitle') }}</text>
+				</view>
+				<view class="rate-pill">
+					<image class="rate-pill-icon" src="/static/icons/ui-swap-light.png" />
+					<text class="rate-pill-text">{{ t('stats.rateNote') }}</text>
+				</view>
+			</view>
+
+			<view class="row justify-between items-center month-row enter-rise enter-d1">
+				<month-switch :label="monthTitle" @prev="prevMonth" @next="nextMonth" />
+				<view class="section-count">
+					<text class="section-count-text">{{ t('stats.allMonths') }}</text>
+				</view>
+			</view>
+
+			<view v-if="!ledger.loaded" class="loading-wrap">
+				<image class="logo-40" src="/static/icons/logo-light.png" />
+				<text class="loading-text">{{ ledger.error.length > 0 ? t('common.networkError') : t('common.loading') }}</text>
+			</view>
+
+			<view v-else>
+				<view class="card hero-card enter-pop enter-d2">
+					<view class="row hero-row">
+						<view class="donut-holder">
+							<donut-chart
+								:segments="segments"
+								:size="158"
+								:thickness="16"
+								:center-value="donutCenterValue"
+								:center-label="donutCenterLabel"
+							/>
+						</view>
+						<view class="hero-right">
+							<text class="hero-label">{{ t('stats.expenseTotal') }}</text>
+							<view class="row items-end hero-amount-line">
+								<text class="hero-amount">{{ heroExpenseAmountText }}</text>
+								<text class="hero-currency">{{ prefs.baseCurrency }}</text>
+							</view>
+
+							<view class="hero-divider"></view>
+
+							<view class="row items-center hero-stat">
+								<view class="dot dot-mint"></view>
+								<text class="hero-stat-label">{{ t('stats.income') }}</text>
+								<text class="hero-stat-value amount-pos">{{ incomeText }}</text>
+							</view>
+							<view class="row items-center hero-stat">
+								<view class="dot dot-ink"></view>
+								<text class="hero-stat-label">{{ t('stats.net') }}</text>
+								<text class="hero-stat-value">{{ netText }}</text>
+							</view>
+
+							<view class="saving-pill">
+								<text class="saving-pill-text">{{ t('stats.savings') }} {{ savingsText }}</text>
+							</view>
+						</view>
+					</view>
+				</view>
+
+				<view class="section-header enter-rise enter-d3">
+					<view>
+						<text class="section-title">{{ t('stats.byCategory') }}</text>
+						<text class="section-sub">{{ categoryCountText }}</text>
+					</view>
+					<view class="legend-caption">
+						<view class="dot dot-orange"></view>
+						<text class="legend-caption-text">{{ t('stats.percentOfSpend') }}</text>
+					</view>
+				</view>
+
+				<view v-if="legend.length == 0" class="mt-8">
+					<empty-state
+						:title="t('stats.noData')"
+						:subtitle="t('stats.noDataSub')"
+						:action="t('home.add')"
+						icon="/static/icons/logo-light.png"
+						@action="addEntry"
+					/>
+				</view>
+
+				<view v-else class="card legend-card enter-rise enter-d4">
+					<view v-for="(item, index) in legend" :key="item.categoryId">
+						<view class="legend-row">
+							<view class="row items-center">
+								<view class="legend-dot" :style="'background-color: ' + item.color"></view>
+								<text class="legend-name">{{ item.name }}</text>
+								<text class="legend-percent">{{ item.percentText }}</text>
+								<text class="legend-amount">{{ item.amountText }}</text>
+							</view>
+							<view class="legend-track">
+								<view class="legend-fill" :style="'width: ' + item.width + '%; background-color: ' + item.color"></view>
+							</view>
+						</view>
+						<view v-if="index < legend.length - 1" class="legend-gap"></view>
+					</view>
+				</view>
+
+				<view class="card trend-card enter-rise enter-d5">
+					<view class="row justify-between items-center">
+						<view>
+							<text class="section-title">{{ t('stats.trend') }}</text>
+							<text class="section-sub">{{ t('stats.trendSub') }}</text>
+						</view>
+						<view class="row items-center">
+							<view class="row items-center trend-legend">
+								<view class="dot dot-mint"></view>
+								<text class="trend-legend-text">{{ t('stats.income') }}</text>
+							</view>
+							<view class="row items-center trend-legend trend-legend-last">
+								<view class="dot dot-orange"></view>
+								<text class="trend-legend-text">{{ t('stats.expense') }}</text>
+							</view>
+						</view>
+					</view>
+					<view class="mt-10">
+						<trend-chart :months="months" />
+					</view>
+				</view>
+
+				<view class="section-header enter-rise enter-d3">
+					<view>
+						<text class="section-title">{{ t('stats.insights') }}</text>
+						<text class="section-sub">{{ monthTitle }}</text>
+					</view>
+				</view>
+
+				<view class="row wrap insight-grid enter-rise enter-d5">
+					<view v-for="(item, index) in insights" :key="item.key" :class="index % 2 == 0 ? 'insight-card insight-card-left' : 'insight-card'">
+						<view class="insight-icon">
+							<image class="icon-18" :src="item.icon" />
+						</view>
+						<text class="insight-label">{{ item.label }}</text>
+						<text class="insight-value">{{ item.value }}</text>
+						<text class="insight-sub">{{ item.sub }}</text>
+					</view>
+				</view>
+
+				<view class="tabbar-space"></view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, onMounted, ref, watch } from 'vue'
+	import MonthSwitch from '@/components/month-switch.uvue'
+	import DonutChart from '@/components/donut-chart.uvue'
+	import TrendChart from '@/components/trend-chart.uvue'
+	import EmptyState from '@/components/empty-state.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs } from '@/stores/prefs.uts'
+	import { ledger, ensureLoaded, setMonth } from '@/stores/ledger.uts'
+	import {
+		categoryStats,
+		dailyAverage,
+		largestExpense,
+		monthSummary,
+		monthlySeries
+	} from '@/utils/stats.uts'
+	import { addMonthsKey, monthLabel } from '@/utils/date.uts'
+	import { formatCurrency, formatPercent } from '@/utils/money.uts'
+	import { categoryById, categoryName } from '@/constants/categories.uts'
+	import { ChartSegment, MonthStat, Transaction } from '@/types/models.uts'
+
+	defineOptions({
+		styleIsolation: 'app'
+	})
+
+	type LegendView = {
+		categoryId : string
+		name : string
+		color : string
+		percentText : string
+		amountText : string
+		width : number
+	}
+
+	type InsightView = {
+		key : string
+		label : string
+		value : string
+		sub : string
+		icon : string
+	}
+
+	onMounted(() => {
+		ensureLoaded()
+		if (ledger.loaded) animateExpense()
+	})
+
+	const monthTitle = computed(() : string => {
+		return monthLabel(ledger.currentMonth, prefs.locale)
+	})
+
+	const summary = computed(() => {
+		return monthSummary(ledger.transactions, ledger.currentMonth)
+	})
+
+	const expenseAmountText = computed(() : string => {
+		return formatCurrency(summary.value.expense, prefs.baseCurrency, prefs.locale)
+	})
+
+	const animExpense = ref(0)
+	let statsCountToken = 0
+
+	const heroExpenseAmountText = computed(() : string => {
+		return formatCurrency(animExpense.value, prefs.baseCurrency, prefs.locale)
+	})
+
+	function animateExpense() : void {
+		const target = summary.value.expense
+		const from = animExpense.value
+		statsCountToken = statsCountToken + 1
+		const token = statsCountToken
+		const started = Date.now()
+		const step = () : void => {
+			if (token != statsCountToken) return
+			let progress = (Date.now() - started) / 760
+			if (progress > 1) progress = 1
+			const eased = 1 - Math.pow(1 - progress, 3)
+			animExpense.value = from + (target - from) * eased
+			if (progress < 1) {
+				setTimeout(step, 32)
+			}
+		}
+		step()
+	}
+
+	watch(() => ledger.loaded, (_value) => {
+		if (ledger.loaded) animateExpense()
+	})
+
+	watch(() => ledger.currentMonth, (_value) => {
+		if (ledger.loaded) animateExpense()
+	})
+
+	const incomeText = computed(() : string => {
+		return formatCurrency(summary.value.income, prefs.baseCurrency, prefs.locale)
+	})
+
+	const netText = computed(() : string => {
+		return formatCurrency(summary.value.balance, prefs.baseCurrency, prefs.locale)
+	})
+
+	const savingsRate = computed(() : number => {
+		if (summary.value.income <= 0) return 0
+		return summary.value.balance / summary.value.income * 100
+	})
+
+	const savingsText = computed(() : string => {
+		return formatPercent(savingsRate.value)
+	})
+
+	const catStats = computed(() => {
+		return categoryStats(ledger.transactions, ledger.currentMonth)
+	})
+
+	const categoryCountText = computed(() : string => {
+		return catStats.value.length.toString() + ' ' + t('stats.categories')
+	})
+
+	const segments = computed<Array<ChartSegment>>(() => {
+		const result : Array<ChartSegment> = []
+		const stats = catStats.value
+		let otherValue = 0
+		for (let i = 0; i < stats.length; i++) {
+			if (i < 5) {
+				const cat = categoryById(stats[i].categoryId)
+				const name = prefs.locale == 'en' ? cat.nameEn : cat.nameZh
+				result.push({ label: name, value: stats[i].amount, color: cat.color })
+			} else {
+				otherValue += stats[i].amount
+			}
+		}
+		if (otherValue > 0) {
+			result.push({ label: t('stats.other'), value: otherValue, color: '#7E8B84' })
+		}
+		return result
+	})
+
+	const legend = computed<Array<LegendView>>(() => {
+		const result : Array<LegendView> = []
+		const stats = catStats.value
+		const total = summary.value.expense
+		if (total <= 0) return result
+		let otherValue = 0
+		for (let i = 0; i < stats.length; i++) {
+			const item = stats[i]
+			if (i < 5) {
+				const cat = categoryById(item.categoryId)
+				const pct = item.amount / total * 100
+				result.push({
+					categoryId: item.categoryId,
+					name: prefs.locale == 'en' ? cat.nameEn : cat.nameZh,
+					color: cat.color,
+					percentText: formatPercent(pct),
+					amountText: formatCurrency(item.amount, prefs.baseCurrency, prefs.locale),
+					width: pct > 100 ? 100 : (pct < 2 ? 2 : pct)
+				})
+			} else {
+				otherValue += item.amount
+			}
+		}
+		if (otherValue > 0) {
+			const pct = otherValue / total * 100
+			result.push({
+				categoryId: 'others',
+				name: t('stats.other'),
+				color: '#7E8B84',
+				percentText: formatPercent(pct),
+				amountText: formatCurrency(otherValue, prefs.baseCurrency, prefs.locale),
+				width: pct > 100 ? 100 : (pct < 2 ? 2 : pct)
+			})
+		}
+		return result
+	})
+
+	const months = computed<Array<MonthStat>>(() => {
+		return monthlySeries(ledger.transactions, ledger.currentMonth, 6)
+	})
+
+	const topCategory = computed(() => {
+		if (catStats.value.length == 0) return null
+		return catStats.value[0]
+	})
+
+	const donutCenterValue = computed(() : string => {
+		const first = topCategory.value
+		if (first == null || summary.value.expense <= 0) return '0%'
+		return formatPercent(first.amount / summary.value.expense * 100)
+	})
+
+	const donutCenterLabel = computed(() : string => {
+		const first = topCategory.value
+		if (first == null) return t('stats.donutCenter')
+		return categoryName(first.categoryId, prefs.locale)
+	})
+
+	const topCategoryText = computed(() : string => {
+		const first = topCategory.value
+		if (first == null) return t('stats.noLargest')
+		return categoryName(first.categoryId, prefs.locale)
+	})
+
+	const topCategorySub = computed(() : string => {
+		const first = topCategory.value
+		if (first == null || summary.value.expense <= 0) return t('stats.noLargest')
+		const pct = first.amount / summary.value.expense * 100
+		return formatPercent(pct) + ' ' + t('stats.percentOfSpend')
+	})
+
+	const dailyAverageText = computed(() : string => {
+		return formatCurrency(dailyAverage(ledger.transactions, ledger.currentMonth), prefs.baseCurrency, prefs.locale)
+	})
+
+	const largest = computed<Transaction | null>(() => {
+		return largestExpense(ledger.transactions, ledger.currentMonth)
+	})
+
+	const largestText = computed(() : string => {
+		const item = largest.value
+		if (item == null) return t('stats.noLargest')
+		return formatCurrency(item.amount, item.currency, prefs.locale)
+	})
+
+	const largestSub = computed(() : string => {
+		const item = largest.value
+		if (item == null) return ''
+		return categoryName(item.categoryId, prefs.locale)
+	})
+
+	const insights = computed<Array<InsightView>>(() => {
+		const result : Array<InsightView> = []
+		result.push({
+			key: 'savings',
+			label: t('stats.savings'),
+			value: savingsText.value,
+			sub: t('stats.net') + ' ' + netText.value,
+			icon: '/static/icons/ui-wallet-light.png'
+		})
+		result.push({
+			key: 'daily',
+			label: t('stats.avgDaily'),
+			value: dailyAverageText.value,
+			sub: t('stats.rateNote'),
+			icon: '/static/icons/ui-calendar-light.png'
+		})
+		result.push({
+			key: 'largest',
+			label: t('stats.largest'),
+			value: largestText.value,
+			sub: largestSub.value,
+			icon: '/static/icons/ui-arrow-up-light.png'
+		})
+		result.push({
+			key: 'top',
+			label: t('stats.topCategory'),
+			value: topCategoryText.value,
+			sub: topCategorySub.value,
+			icon: '/static/icons/ui-sparkles-light.png'
+		})
+		return result
+	})
+
+	function prevMonth() : void {
+		setMonth(addMonthsKey(ledger.currentMonth, -1))
+	}
+
+	function nextMonth() : void {
+		setMonth(addMonthsKey(ledger.currentMonth, 1))
+	}
+
+	function addEntry() : void {
+		uni.navigateTo({
+			url: '/pages/record-edit/record-edit'
+		})
+	}
+</script>
+
+<style>
+	.tab-view {
+		flex-direction: column;
+		position: relative;
+	}
+	.topbar {
+		padding-top: 2px;
+		padding-bottom: 2px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.head-left {
+		flex-direction: column;
+	}
+
+	.page-title {
+		font-size: 27px;
+		font-weight: 800;
+		letter-spacing: -0.8px;
+		color: #F2F6F1;
+	}
+
+	.page-sub {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		margin-top: 5px;
+	}
+
+	.rate-pill {
+		height: 28px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.06);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 9px;
+		padding-right: 10px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+	}
+
+	.rate-pill-icon {
+		width: 11px;
+		height: 11px;
+		opacity: 0.55;
+	}
+
+	.rate-pill-text {
+		font-size: 9px;
+		color: rgba(234,242,237,0.56);
+		margin-left: 5px;
+	}
+
+	.month-row {
+		margin-top: 16px;
+	}
+
+	.section-count {
+		height: 28px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.06);
+		padding-left: 11px;
+		padding-right: 11px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.10);
+	}
+
+	.section-count-text {
+		font-size: 10px;
+		color: rgba(234,242,237,0.55);
+		font-weight: 600;
+	}
+
+	.hero-card {
+		margin-top: 12px;
+		padding: 16px;
+		background-color: rgba(17,24,20,0.64);
+		background-image: radial-gradient(125% 120% at 96% -14%, rgba(123,231,191,0.22) 0%, rgba(123,231,191,0.06) 44%, rgba(255,255,255,0.02) 70%, rgba(255,255,255,0.05) 100%);
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.16), inset 0 1px 0 rgba(255,255,255,0.22), 0 22px 48px rgba(0,0,0,0.48);
+	}
+
+	.hero-row {
+		align-items: center;
+	}
+
+	.donut-holder {
+		width: 158px;
+		height: 158px;
+	}
+
+	.hero-right {
+		flex: 1;
+		flex-direction: column;
+		margin-left: 16px;
+	}
+
+	.hero-label {
+		font-size: 10px;
+		color: rgba(234,242,237,0.56);
+	}
+
+	.hero-amount-line {
+		margin-top: 4px;
+	}
+
+	.hero-amount {
+		font-size: 24px;
+		font-weight: 800;
+		color: #F2F6F1;
+		letter-spacing: -0.8px;
+	}
+
+	.hero-currency {
+		font-size: 9px;
+		color: rgba(234,242,237,0.40);
+		margin-left: 4px;
+		margin-bottom: 3px;
+	}
+
+	.hero-divider {
+		height: 1px;
+		background-color: rgba(255,255,255,0.08);
+		margin-top: 10px;
+		margin-bottom: 9px;
+	}
+
+	.hero-stat {
+		margin-bottom: 6px;
+	}
+
+	.hero-stat-label {
+		font-size: 10px;
+		color: rgba(234,242,237,0.56);
+		margin-left: 6px;
+	}
+
+	.hero-stat-value {
+		font-size: 11px;
+		font-weight: 700;
+		color: #F2F6F1;
+		margin-left: auto;
+	}
+
+	.dot-ink {
+		background-color: rgba(245,247,244,0.55);
+	}
+
+	.saving-pill {
+		height: 24px;
+		border-radius: 12px;
+		background-color: rgba(123,231,191,0.12);
+		padding-left: 9px;
+		padding-right: 9px;
+		align-items: center;
+		justify-content: center;
+		align-self: flex-start;
+		margin-top: 3px;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.16);
+	}
+
+	.saving-pill-text {
+		font-size: 9px;
+		font-weight: 700;
+		color: #8FE3BC;
+	}
+
+	.section-header {
+		margin-top: 20px;
+		margin-bottom: 9px;
+		padding-left: 4px;
+		padding-right: 4px;
+		flex-direction: row;
+		align-items: flex-end;
+		justify-content: space-between;
+	}
+
+	.section-title {
+		font-size: 16px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.section-sub {
+		font-size: 11px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+	}
+
+	.legend-caption {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.legend-caption-text {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-left: 5px;
+	}
+
+	.legend-card {
+		padding: 16px;
+	}
+
+	.legend-row {
+		flex-direction: column;
+	}
+
+	.legend-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 4px;
+	}
+
+	.legend-name {
+		font-size: 12px;
+		font-weight: 650;
+		color: #F2F6F1;
+		margin-left: 8px;
+	}
+
+	.legend-percent {
+		font-size: 10px;
+		color: rgba(234,242,237,0.42);
+		margin-left: auto;
+		margin-right: 10px;
+	}
+
+	.legend-amount {
+		font-size: 12px;
+		font-weight: 700;
+		color: #F2F6F1;
+		min-width: 52px;
+		text-align: right;
+	}
+
+	.legend-track {
+		height: 5px;
+		border-radius: 3px;
+		background-color: rgba(255,255,255,0.08);
+		overflow: hidden;
+		margin-top: 7px;
+	}
+
+	.legend-fill {
+		height: 5px;
+		border-radius: 3px;
+		transform-origin: 0 50%;
+		animation-name: mintGrowX;
+		animation-duration: 620ms;
+		animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+		animation-fill-mode: backwards;
+		animation-delay: 260ms;
+	}
+
+	.legend-gap {
+		height: 13px;
+	}
+
+	.trend-card {
+		margin-top: 14px;
+		padding: 17px 16px 10px 16px;
+	}
+
+	.trend-legend {
+		margin-left: 10px;
+	}
+
+	.trend-legend-last {
+		margin-left: 12px;
+	}
+
+	.trend-legend-text {
+		font-size: 9px;
+		color: rgba(234,242,237,0.52);
+		margin-left: 4px;
+	}
+
+	.insight-grid {
+		flex-direction: row;
+	}
+
+	.insight-card {
+		width: calc(50% - 5px);
+		background-color: rgba(255,255,255,0.045);
+		background-image: linear-gradient(150deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.025) 52%, rgba(255,255,255,0.055) 100%);
+		border-radius: 21px;
+		padding: 14px;
+		margin-bottom: 10px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.16), 0 12px 28px rgba(0,0,0,0.40);
+		flex-direction: column;
+	}
+
+	.insight-card-left {
+		margin-right: 10px;
+	}
+
+	.insight-icon {
+		width: 32px;
+		height: 32px;
+		border-radius: 10px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.insight-label {
+		font-size: 10px;
+		color: rgba(234,242,237,0.52);
+		margin-top: 10px;
+	}
+
+	.insight-value {
+		font-size: 16px;
+		font-weight: 750;
+		color: #F2F6F1;
+		margin-top: 3px;
+		letter-spacing: -0.3px;
+	}
+
+	.insight-sub {
+		font-size: 9px;
+		color: rgba(234,242,237,0.38);
+		margin-top: 4px;
+		line-height: 13px;
+	}
+
+	.loading-text {
+		font-size: 12px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 14px;
+	}
+</style>

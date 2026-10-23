@@ -1,0 +1,109 @@
+<template>
+	<view class="trend-chart">
+		<view class="trend-col" v-for="(item, index) in props.months" :key="index">
+			<view class="trend-bars">
+				<view class="trend-bar trend-income" :style="'height: ' + barHeight(item.income) + 'px; animation-delay: ' + (150 + index * 45) + 'ms'"></view>
+				<view class="trend-bar trend-expense" :style="'height: ' + barHeight(item.expense) + 'px; animation-delay: ' + (180 + index * 45) + 'ms'"></view>
+			</view>
+			<text class="trend-label">{{ monthShortLabel(item.key, prefs.locale) }}</text>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, PropType } from 'vue'
+	import { MonthStat } from '@/types/models.uts'
+	import { prefs } from '@/stores/prefs.uts'
+	import { monthShortLabel } from '@/utils/date.uts'
+
+	defineOptions({
+		styleIsolation: 'app'
+	})
+
+	const props = defineProps({
+		months: {
+			type: Array as PropType<Array<MonthStat>>,
+			default: () : Array<MonthStat> => [] as Array<MonthStat>
+		},
+		height: {
+			type: Number,
+			default: 108
+		}
+	})
+
+	const maxValue = computed(() : number => {
+		let max = 1
+		for (let i = 0; i < props.months.length; i++) {
+			if (props.months[i].income > max) max = props.months[i].income
+			if (props.months[i].expense > max) max = props.months[i].expense
+		}
+		return max
+	})
+
+	function barHeight(value : number) : number {
+		if (value <= 0) return 3
+		const h = Math.round(value / maxValue.value * props.height)
+		return h < 4 ? 4 : h
+	}
+</script>
+
+<style>
+	.trend-chart {
+		height: 138px;
+		flex-direction: row;
+		align-items: flex-end;
+	}
+
+	.trend-col {
+		flex: 1;
+		align-items: center;
+		flex-direction: column;
+	}
+
+	.trend-bars {
+		height: 112px;
+		flex-direction: row;
+		align-items: flex-end;
+		justify-content: center;
+	}
+
+	@keyframes trendRise {
+		from {
+			opacity: 0.2;
+			transform: scaleY(0.05);
+		}
+		to {
+			opacity: 1;
+			transform: scaleY(1);
+		}
+	}
+
+	.trend-bar {
+		width: 9px;
+		border-radius: 5px;
+		transform-origin: 50% 100%;
+		animation-name: trendRise;
+		animation-duration: 560ms;
+		animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+		animation-fill-mode: backwards;
+	}
+
+	.trend-income {
+		background-color: #A9EDCB;
+		background-image: linear-gradient(180deg, #D6F8E6 0%, #A9EDCB 48%, #7BE7BF 100%);
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+		margin-right: 3px;
+	}
+
+	.trend-expense {
+		background-color: #F0A06A;
+		background-image: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(240,160,106,0.30) 46%, rgba(240,160,106,0.72) 100%);
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.20);
+	}
+
+	.trend-label {
+		font-size: 10px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 8px;
+	}
+</style>

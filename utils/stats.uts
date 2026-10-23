@@ -1,0 +1,214 @@
+import {
+	Budget,
+	BudgetAlert,
+	CategoryStat,
+	Debt,
+	DebtSummary,
+	MonthStat,
+	MonthSummary,
+	Transaction
+} from '@/types/models.uts'
+import { prefs } from '@/stores/prefs.uts'
+import { addMonthsKey, daysInMonth, monthKeyOf, thisMonthKey, weekBucketIndex } from '@/utils/date.uts'
+import { convertAmount } from '@/utils/money.uts'
+
+export function toBase(amount : number, currency : string) : number {
+	return convertAmount(amount, currency, prefs.baseCurrency, prefs.rates)
+}
+
+export function txInMonth(tx : Transaction, monthKey : string) : boolean {
+	return monthKeyOf(tx.date) == monthKey
+}
+
+export function transactionsInMonth(txs : Array<Transaction>, monthKey : string) : Array<Transaction> {
+	const result : Array<Transaction> = []
+	for (let i = 0; i < txs.length; i++) {
+		if (txInMonth(txs[i], monthKey)) {
+			result.push(txs[i])
+		}
+	}
+	return result
+}
+
+export function countInMonth(txs : Array<Transaction>, monthKey : string) : number {
+	let count = 0
+	for (let i = 0; i < txs.length; i++) {
+		if (txInMonth(txs[i], monthKey)) count++
+	}
+	return count
+}
+
+export function monthSummary(txs : Array<Transaction>, monthKey : string) : MonthSummary {
+	let income = 0
+	let expense = 0
+	for (let i = 0; i < txs.length; i++) {
+		const tx = txs[i]
+		if (!txInMonth(tx, monthKey)) continue
+		const value = toBase(tx.amount, tx.currency)
+		if (tx.type == 'income') {
+			income += value
+		} else {
+			expense += value
+		}
+	}
+	return { income: income, expense: expense, balance: income - expense }
+}
+
+export function categoryStats(txs : Array<Transaction>, monthKey : string) : Array<CategoryStat> {
+	const result : Array<CategoryStat> = []
+	for (let i = 0; i < txs.length; i++) {
+		const tx = txs[i]
+		if (tx.type != 'expense' || !txInMonth(tx, monthKey)) continue
+		const value = toBase(tx.amount, tx.currency)
+		let found = false
+		for (let j = 0; j < result.length; j++) {
+			if (result[j].categoryId == tx.categoryId) {
+				result[j].amount += value
+				result[j].count += 1
+				found = true
+				break
+			}
+		}
+		if (!found) {
+			result.push({ categoryId: tx.categoryId, amount: value, count: 1 })
+		}
+	}
+	for (let i = 1; i < result.length; i++) {
+		const current = result[i]
+		let j = i - 1
+		while (j >= 0 && result[j].amount < current.amount) {
+			result[j + 1] = result[j]
+			j--
+		}
+		result[j + 1] = current
+	}
+	return result
+}
+
+export function weeklyExpense(txs : Array<Transaction>, monthKey : string) : Array<number> {
+	const buckets : Array<number> = [0, 0, 0, 0, 0]
+	for (let i = 0; i < txs.length; i++) {
+		const tx = txs[i]
+		if (tx.type != 'expense' || !txInMonth(tx, monthKey)) continue
+		const index = weekBucketIndex(tx.date)
+		buckets[index] += toBase(tx.amount, tx.currency)
+	}
+	return buckets
+}
+
+export function monthlySeries(txs : Array<Transaction>, endKey : string, count : number) : Array<MonthStat> {
+	const result : Array<MonthStat> = []
+	for (let i = count - 1; i >= 0; i--) {
+		const key = addMonthsKey(endKey, -i)
+		const summary = monthSummary(txs, key)
+		result.push({ key: key, income: summary.income, expense: summary.expense })
+	}
+	return result
+}
+
+export function debtSummary(debts : Array<Debt>) : DebtSummary {
+	let receivable = 0
+	let payable = 0
+	for (let i = 0; i < debts.length; i++) {
+		const debt = debts[i]
+		if (debt.settled) continue
+		const value = toBase(debt.amount, debt.currency)
+		if (debt.direction == 'receivable') {
+			receivable += value
+		} else {
+			payable += value
+		}
+	}
+	return { receivable: receivable, payable: payable, net: receivable - payable }
+}
+
+export function openDebtCount(debts : Array<Debt>, direction : string) : number {
+	let count = 0
+	for (let i = 0; i < debts.length; i++) {
+		if (!debts[i].settled && debts[i].direction == direction) count++
+	}
+	return count
+}
+
+export function budgetSpent(budget : Budget, txs : Array<Transaction>, monthKey : string) : number {
+	let total = 0
+	for (let i = 0; i < txs.length; i++) {
+		const tx = txs[i]
+		if (tx.type != 'expense' || !txInMonth(tx, monthKey)) continue
+		if (budget.categoryId != 'all' && tx.categoryId != budget.categoryId) continue
+		total += convertAmount(tx.amount, tx.currency, budget.currency, prefs.rates)
+	}
+	return total
+}
+
+export function budgetPercent(budget : Budget, txs : Array<Transaction>, monthKey : string) : number {
+	if (budget.amount <= 0) return 0
+	return budgetSpent(budget, txs, monthKey) / budget.amount * 100
+}
+
+export function totalBudget(budgets : Array<Budget>) : Budget | null {
+	for (let i = 0; i < budgets.length; i++) {
+		if (budgets[i].categoryId == 'all') return budgets[i]
+	}
+	return null
+}
+
+export function collectBudgetAlerts(budgets : Array<Budget>, txs : Array<Transaction>, monthKey : string) : Array<BudgetAlert> {
+	const alerts : Array<BudgetAlert> = []
+	for (let i = 0; i < budgets.length; i++) {
+		const budget = budgets[i]
+		const spent = budgetSpent(budget, txs, monthKey)
+		const percent = budget.amount > 0 ? spent / budget.amount * 100 : 0
+		const threshold = budget.alertAt > 0 ? budget.alertAt : 80
+		if (percent >= threshold) {
+			alerts.push({
+				budgetId: budget.id,
+				categoryId: budget.categoryId,
+				percent: percent,
+				spent: spent,
+				limit: budget.amount,
+				currency: budget.currency
+			})
+		}
+	}
+	for (let i = 1; i < alerts.length; i++) {
+		const current = alerts[i]
+		let j = i - 1
+		while (j >= 0 && alerts[j].percent < current.percent) {
+			alerts[j + 1] = alerts[j]
+			j--
+		}
+		alerts[j + 1] = current
+	}
+	return alerts
+}
+
+export function dailyAverage(txs : Array<Transaction>, monthKey : string) : number {
+	const summary = monthSummary(txs, monthKey)
+	if (summary.expense <= 0) return 0
+	const now = new Date()
+	const currentKey = thisMonthKey()
+	let days = daysInMonth(monthKey)
+	if (monthKey == currentKey) {
+		days = now.getDate()
+	} else if (monthKey > currentKey) {
+		return 0
+	}
+	if (days <= 0) return 0
+	return summary.expense / days
+}
+
+export function largestExpense(txs : Array<Transaction>, monthKey : string) : Transaction | null {
+	let result : Transaction | null = null
+	let maxValue = 0
+	for (let i = 0; i < txs.length; i++) {
+		const tx = txs[i]
+		if (tx.type != 'expense' || !txInMonth(tx, monthKey)) continue
+		const value = toBase(tx.amount, tx.currency)
+		if (value > maxValue) {
+			maxValue = value
+			result = tx
+		}
+	}
+	return result
+}

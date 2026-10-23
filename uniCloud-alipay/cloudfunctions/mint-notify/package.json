@@ -1,0 +1,20 @@
+{
+  "name": "mint-notify",
+  "version": "1.0.0",
+  "description": "Mint 预算提醒定时器：每天扫描预算使用率，通过微信订阅消息推送提醒",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {},
+  "cloudfunction-config": {
+    "concurrency": 1,
+    "memorySize": 256,
+    "timeout": 60,
+    "triggers": [
+      {
+        "name": "mint-daily-9am",
+        "type": "timer",
+        "config": "0 0 9 * * * *"
+      }
+    ]
+  }
+}

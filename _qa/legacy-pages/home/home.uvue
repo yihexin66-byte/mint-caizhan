@@ -1,0 +1,1138 @@
+<template>
+	<view class="page">
+		<aurora-bg level="high" />
+		<view class="status-spacer"></view>
+		<view class="page-content">
+			<view class="topbar enter-fade">
+				<view class="row items-center">
+					<image class="logo-28" src="/static/icons/logo-light.png" />
+					<text class="brand">Mint.</text>
+				</view>
+				<view class="row items-center">
+					<view class="icon-btn" @click="goBudgets">
+						<image class="icon-18" src="/static/icons/ui-bell-light.png" />
+					</view>
+					<view class="avatar avatar-mint" @click="goSettings">
+						<text class="avatar-letter">{{ avatarLetter }}</text>
+					</view>
+				</view>
+			</view>
+
+			<view v-if="!ledger.loaded" class="loading-wrap">
+				<image class="logo-40" src="/static/icons/logo-light.png" />
+				<text class="loading-text">{{ ledger.error.length > 0 ? t('common.networkError') : t('common.loading') }}</text>
+				<view v-if="ledger.error.length > 0" class="btn btn-small btn-ghost loading-retry" @click="retryLoad">
+					<text class="btn-ghost-text">{{ t('common.retry') }}</text>
+				</view>
+			</view>
+
+			<view v-else>
+				<view class="hello-block enter-rise enter-d1">
+					<text class="hello-title">{{ greetingText }}</text>
+					<text class="hero-subtitle">{{ t('home.subtitle') }}</text>
+				</view>
+
+				<view class="row justify-between items-center month-row enter-rise enter-d2">
+					<month-switch :label="monthTitle" @prev="prevMonth" @next="nextMonth" />
+					<view class="month-hint">
+						<view class="dot dot-mint"></view>
+						<text class="month-hint-text">{{ t('home.thisMonth') }}</text>
+					</view>
+				</view>
+
+				<view class="hero enter-pop enter-d3">
+					<view class="hero-orbit"></view>
+					<view class="hero-orbit hero-orbit-2"></view>
+					<view class="row justify-between items-center">
+						<text class="hero-label">{{ t('home.balance') }}</text>
+						<view class="hero-count">
+							<text class="hero-count-text">{{ monthCountText }}</text>
+						</view>
+					</view>
+					<text class="hero-amount">{{ heroBalanceText }}</text>
+
+					<view class="row hero-stats">
+						<view class="hero-stat">
+							<view class="row items-center">
+								<view class="dot dot-mint"></view>
+								<text class="hero-stat-label">{{ t('home.income') }}</text>
+							</view>
+							<text class="hero-stat-value">{{ heroIncomeText }}</text>
+						</view>
+						<view class="hero-stat hero-stat-right">
+							<view class="row items-center">
+								<view class="dot dot-orange"></view>
+								<text class="hero-stat-label">{{ t('home.expense') }}</text>
+							</view>
+							<text class="hero-stat-value">{{ heroExpenseText }}</text>
+						</view>
+					</view>
+
+					<view class="hero-line"></view>
+					<view class="row justify-between items-center">
+						<text class="hero-foot">{{ summaryHint }}</text>
+						<view class="hero-cta" @click="addEntry">
+							<view class="hero-cta-icon">
+								<image class="hero-plus" src="/static/icons/nav-plus-active.png" />
+							</view>
+							<text class="hero-cta-text">{{ t('home.add') }}</text>
+						</view>
+					</view>
+				</view>
+
+				<view class="debt-row enter-rise enter-d4">
+					<view class="debt-card" @click="goDebts">
+						<view class="row justify-between items-center">
+							<view class="debt-icon debt-icon-in">
+								<image class="icon-18" src="/static/icons/ui-arrow-down-light.png" />
+							</view>
+							<image class="debt-arrow" src="/static/icons/ui-right-light.png" />
+						</view>
+						<text class="debt-label">{{ t('home.debtReceivable') }}</text>
+						<text class="debt-amount">{{ receivableText }}</text>
+						<text class="debt-sub">{{ receivableCountText }}</text>
+					</view>
+					<view class="debt-card debt-card-right" @click="goDebts">
+						<view class="row justify-between items-center">
+							<view class="debt-icon debt-icon-out">
+								<image class="icon-18" src="/static/icons/ui-arrow-up-light.png" />
+							</view>
+							<image class="debt-arrow" src="/static/icons/ui-right-light.png" />
+						</view>
+						<text class="debt-label">{{ t('home.debtPayable') }}</text>
+						<text class="debt-amount">{{ payableText }}</text>
+						<text class="debt-sub">{{ payableCountText }}</text>
+					</view>
+				</view>
+
+				<view v-if="alertItem != null" class="alert-banner alert-home enter-rise enter-d4">
+					<view class="alert-icon">
+						<image class="icon-16" src="/static/icons/ui-bell-light.png" />
+					</view>
+					<view class="grow">
+						<text class="alert-title">{{ alertTitle }}</text>
+						<text class="alert-sub">{{ alertSub }}</text>
+					</view>
+					<view class="alert-close" @click="dismissTopAlert">
+						<image class="alert-close-icon" src="/static/icons/ui-close-light.png" />
+					</view>
+				</view>
+
+				<view v-if="showOnboarding" class="onboarding-card enter-rise enter-d4">
+					<view class="onboarding-head">
+						<view class="onboarding-badge">
+							<image class="onboarding-badge-icon" src="/static/icons/ui-sparkles-light.png" />
+							<text class="onboarding-badge-text">{{ t('home.onboardingBadge') }}</text>
+						</view>
+						<image class="onboarding-logo" src="/static/icons/logo-light.png" />
+					</view>
+					<text class="onboarding-title">{{ t('home.emptyTitle') }}</text>
+					<text class="onboarding-sub">{{ t('home.emptySub') }}</text>
+					<view class="btn btn-mint onboarding-btn" @click="addEntry">
+						<text class="btn-mint-text">{{ t('home.start') }}</text>
+						<image class="onboarding-btn-icon" src="/static/icons/ui-right.png" />
+					</view>
+				</view>
+
+				<view v-if="!showOnboarding" class="card mt-14 enter-rise enter-d4">
+					<view class="row justify-between items-center">
+						<view>
+							<text class="section-title">{{ t('home.trend') }}</text>
+							<text class="section-sub">{{ t('home.trendSub') }}</text>
+						</view>
+						<view class="trend-total">
+							<text class="trend-total-text">{{ expenseText }}</text>
+						</view>
+					</view>
+					<view class="mt-12">
+						<bar-chart :items="weekItems" />
+					</view>
+				</view>
+
+				<view v-if="!showOnboarding" class="card mt-14 enter-rise enter-d4">
+					<view class="row justify-between items-center">
+						<text class="section-title">{{ t('home.recent') }}</text>
+						<view class="row items-center" @click="goRecords">
+							<text class="link">{{ t('home.viewAll') }}</text>
+							<image class="link-arrow" src="/static/icons/ui-right-light.png" />
+						</view>
+					</view>
+					<view v-if="recent.length == 0" class="recent-empty">
+						<text class="recent-empty-text">{{ t('home.noRecent') }}</text>
+					</view>
+					<view v-else class="mt-6">
+						<view v-for="(tx, index) in recent" :key="tx.id">
+							<tx-row :tx="tx" @tap="openTx(tx.id)" />
+							<view v-if="index < recent.length - 1" class="divider"></view>
+						</view>
+					</view>
+				</view>
+
+				<view class="mt-14 enter-rise enter-d5">
+					<view v-if="totalBudgetItem != null" class="card">
+						<view class="row justify-between items-center">
+							<view>
+								<text class="section-title">{{ t('home.budgetTitle') }}</text>
+								<text class="section-sub">{{ budgetCaption }}</text>
+							</view>
+							<view class="row items-center" @click="goBudgets">
+								<text class="link">{{ t('common.manage') }}</text>
+								<image class="link-arrow" src="/static/icons/ui-right-light.png" />
+							</view>
+						</view>
+
+						<view class="row items-end budget-numbers">
+							<text class="budget-spent">{{ budgetSpentText }}</text>
+							<text class="budget-of">/ {{ budgetLimitText }}</text>
+							<text class="budget-percent">{{ budgetPercentText }}</text>
+						</view>
+						<view class="budget-track">
+							<view :class="budgetOver ? 'budget-fill budget-fill-over' : 'budget-fill'" :style="'width: ' + budgetBarWidth + '%'"></view>
+						</view>
+						<view class="row justify-between items-center mt-8">
+							<text class="budget-left">{{ budgetLeftLabel }}</text>
+							<view class="row items-center">
+								<view class="budget-threshold-dot"></view>
+								<text class="budget-threshold">{{ t('budgets.alertLine') }} {{ alertLineText }}</text>
+							</view>
+						</view>
+
+						<view v-if="budgetPreviews.length > 0" class="budget-preview-list">
+							<view v-for="item in budgetPreviews" :key="item.id" class="budget-preview-row">
+								<view class="budget-preview-dot" :style="'background-color: ' + item.color"></view>
+								<text class="budget-preview-name">{{ item.name }}</text>
+								<view class="budget-mini-track">
+									<view class="budget-mini-fill" :style="'width: ' + item.width + '%; background-color: ' + item.color"></view>
+								</view>
+								<text class="budget-preview-percent">{{ item.percentText }}</text>
+							</view>
+						</view>
+					</view>
+
+					<view v-else class="budget-cta" @click="goBudgets">
+						<view class="budget-cta-icon">
+							<image class="icon-20" src="/static/icons/nav-budget.png" />
+						</view>
+						<view class="grow">
+							<text class="budget-cta-title">{{ t('home.noBudget') }}</text>
+							<text class="budget-cta-sub">{{ t('home.noBudgetSub') }}</text>
+						</view>
+						<view class="budget-cta-btn">
+							<text class="budget-cta-btn-text">{{ t('home.setBudget') }}</text>
+						</view>
+					</view>
+				</view>
+
+				<view class="tabbar-space"></view>
+			</view>
+		</view>
+
+		<app-tabbar active="home" />
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, ref, watch } from 'vue'
+	import AppTabbar from '@/components/app-tabbar.uvue'
+	import AuroraBg from '@/components/aurora-bg.uvue'
+	import MonthSwitch from '@/components/month-switch.uvue'
+	import BarChart from '@/components/bar-chart.uvue'
+	import TxRow from '@/components/tx-row.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs } from '@/stores/prefs.uts'
+	import { session, displayName } from '@/stores/session.uts'
+	import { ledger, ensureLoaded, setMonth, dismissAlert } from '@/stores/ledger.uts'
+	import { loadLedger } from '@/stores/ledger.uts'
+	import {
+		transactionsInMonth,
+		monthSummary,
+		countInMonth,
+		weeklyExpense,
+		debtSummary,
+		openDebtCount,
+		totalBudget,
+		budgetSpent,
+		budgetPercent
+	} from '@/utils/stats.uts'
+	import { addMonthsKey, monthLabel, greetingKey, thisMonthKey, weekBucketIndex } from '@/utils/date.uts'
+	import { formatCurrency, formatPercent } from '@/utils/money.uts'
+	import { Budget, BudgetAlert, BarItem } from '@/types/models.uts'
+	import { categoryById, categoryName } from '@/constants/categories.uts'
+
+	type BudgetPreview = {
+		id : string
+		name : string
+		color : string
+		percentText : string
+		width : number
+	}
+
+	onPageShow(() => {
+		if (!session.isLoggedIn) {
+			uni.reLaunch({
+				url: '/pages/login/login'
+			})
+			return
+		}
+		ensureLoaded()
+		if (ledger.loaded) animateSummary()
+	})
+
+	const monthTitle = computed(() : string => {
+		return monthLabel(ledger.currentMonth, prefs.locale)
+	})
+
+	const greetingText = computed(() : string => {
+		const separator = prefs.locale == 'en' ? ', ' : '，'
+		return t(greetingKey(prefs.locale)) + separator + displayName(prefs.locale)
+	})
+
+	const avatarLetter = computed(() : string => {
+		const name = displayName(prefs.locale)
+		if (name.length == 0) return 'M'
+		return name.substring(0, 1).toUpperCase()
+	})
+
+	const monthTxs = computed(() => {
+		return transactionsInMonth(ledger.transactions, ledger.currentMonth)
+	})
+
+	const summary = computed(() => {
+		return monthSummary(ledger.transactions, ledger.currentMonth)
+	})
+
+	const animBalance = ref(0)
+	const animIncome = ref(0)
+	const animExpense = ref(0)
+	let summaryCountToken = 0
+
+	const heroBalanceText = computed(() : string => {
+		return formatCurrency(animBalance.value, prefs.baseCurrency, prefs.locale)
+	})
+
+	const heroIncomeText = computed(() : string => {
+		return formatCurrency(animIncome.value, prefs.baseCurrency, prefs.locale)
+	})
+
+	const heroExpenseText = computed(() : string => {
+		return formatCurrency(animExpense.value, prefs.baseCurrency, prefs.locale)
+	})
+
+	function animateSummary() : void {
+		const targetBalance = summary.value.balance
+		const targetIncome = summary.value.income
+		const targetExpense = summary.value.expense
+		const fromBalance = animBalance.value
+		const fromIncome = animIncome.value
+		const fromExpense = animExpense.value
+		summaryCountToken = summaryCountToken + 1
+		const token = summaryCountToken
+		const started = Date.now()
+		const step = () : void => {
+			if (token != summaryCountToken) return
+			let progress = (Date.now() - started) / 760
+			if (progress > 1) progress = 1
+			const eased = 1 - Math.pow(1 - progress, 3)
+			animBalance.value = fromBalance + (targetBalance - fromBalance) * eased
+			animIncome.value = fromIncome + (targetIncome - fromIncome) * eased
+			animExpense.value = fromExpense + (targetExpense - fromExpense) * eased
+			if (progress < 1) {
+				setTimeout(step, 32)
+			}
+		}
+		step()
+	}
+
+	watch(() => ledger.loaded, (_value) => {
+		if (ledger.loaded) animateSummary()
+	})
+
+	watch(() => ledger.currentMonth, (_value) => {
+		if (ledger.loaded) animateSummary()
+	})
+
+	const balanceText = computed(() : string => {
+		return formatCurrency(summary.value.balance, prefs.baseCurrency, prefs.locale)
+	})
+
+	const incomeText = computed(() : string => {
+		return formatCurrency(summary.value.income, prefs.baseCurrency, prefs.locale)
+	})
+
+	const expenseText = computed(() : string => {
+		return formatCurrency(summary.value.expense, prefs.baseCurrency, prefs.locale)
+	})
+
+	const monthCountText = computed(() : string => {
+		const count = countInMonth(ledger.transactions, ledger.currentMonth)
+		return count.toString() + ' ' + t('home.entries')
+	})
+
+	const summaryHint = computed(() : string => {
+		const current = summary.value
+		if (current.income <= 0) {
+			return current.expense > 0 ? t('stats.over') : t('home.subtitle')
+		}
+		const rate = current.balance / current.income * 100
+		if (rate >= 0) {
+			return t('stats.saved') + ' ' + formatPercent(rate)
+		}
+		return t('stats.over') + ' ' + formatPercent(Math.abs(rate))
+	})
+
+	const debts = computed(() => {
+		return debtSummary(ledger.debts)
+	})
+
+	const receivableText = computed(() : string => {
+		return formatCurrency(debts.value.receivable, prefs.baseCurrency, prefs.locale)
+	})
+
+	const payableText = computed(() : string => {
+		return formatCurrency(debts.value.payable, prefs.baseCurrency, prefs.locale)
+	})
+
+	const receivableCountText = computed(() : string => {
+		return openDebtCount(ledger.debts, 'receivable').toString() + ' ' + t('home.openDebts')
+	})
+
+	const payableCountText = computed(() : string => {
+		return openDebtCount(ledger.debts, 'payable').toString() + ' ' + t('home.openDebts')
+	})
+
+	const recent = computed(() => {
+		const list = monthTxs.value
+		const limit = list.length > 4 ? 4 : list.length
+		return list.slice(0, limit)
+	})
+
+	const weekItems = computed<Array<BarItem>>(() => {
+		const values = weeklyExpense(ledger.transactions, ledger.currentMonth)
+		const labels : Array<string> = ['01–07', '08–14', '15–21', '22–28', '29–31']
+		let highlight = 0
+		if (ledger.currentMonth == thisMonthKey()) {
+			highlight = weekBucketIndex(Date.now())
+		} else {
+			for (let i = values.length - 1; i >= 0; i--) {
+				if (values[i] > 0) {
+					highlight = i
+					break
+				}
+			}
+		}
+		const items : Array<BarItem> = []
+		for (let i = 0; i < values.length; i++) {
+			items.push({ label: labels[i], value: values[i], highlight: i == highlight })
+		}
+		return items
+	})
+
+	const totalBudgetItem = computed<Budget | null>(() => {
+		return totalBudget(ledger.budgets)
+	})
+
+	const budgetUsed = computed(() : number => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return 0
+		return budgetSpent(budget, ledger.transactions, ledger.currentMonth)
+	})
+
+	const budgetPercentValue = computed(() : number => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return 0
+		return budgetPercent(budget, ledger.transactions, ledger.currentMonth)
+	})
+
+	const budgetOver = computed(() : boolean => {
+		return budgetPercentValue.value > 100
+	})
+
+	const budgetSpentText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		return formatCurrency(budgetUsed.value, budget.currency, prefs.locale)
+	})
+
+	const budgetLimitText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		return formatCurrency(budget.amount, budget.currency, prefs.locale)
+	})
+
+	const budgetPercentText = computed(() : string => {
+		return formatPercent(budgetPercentValue.value)
+	})
+
+	const budgetBarWidth = computed(() : number => {
+		const pct = Math.round(budgetPercentValue.value)
+		return pct > 100 ? 100 : (pct < 2 ? 2 : pct)
+	})
+
+	const budgetLeftLabel = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		const left = budget.amount - budgetUsed.value
+		if (left < 0) {
+			return t('budgets.over') + ' ' + formatCurrency(Math.abs(left), budget.currency, prefs.locale)
+		}
+		return t('home.budgetLeft') + ' ' + formatCurrency(left, budget.currency, prefs.locale)
+	})
+
+	const alertLineText = computed(() : string => {
+		const budget = totalBudgetItem.value
+		if (budget == null) return ''
+		return budget.alertAt.toString() + '%'
+	})
+
+	const budgetCaption = computed(() : string => {
+		return t('budgets.total') + ' · ' + monthTitle.value
+	})
+
+	const budgetPreviews = computed<Array<BudgetPreview>>(() => {
+		const result : Array<BudgetPreview> = []
+		for (let i = 0; i < ledger.budgets.length; i++) {
+			const budget = ledger.budgets[i]
+			if (budget.categoryId == 'all') continue
+			if (result.length >= 2) break
+			const category = categoryById(budget.categoryId)
+			const pct = budgetPercent(budget, ledger.transactions, ledger.currentMonth)
+			result.push({
+				id: budget.id,
+				name: categoryName(budget.categoryId, prefs.locale),
+				color: category.color,
+				percentText: formatPercent(pct),
+				width: pct > 100 ? 100 : (pct < 2 ? 2 : pct)
+			})
+		}
+		return result
+	})
+
+	const showOnboarding = computed(() : boolean => {
+		return ledger.loaded && ledger.transactions.length == 0
+	})
+
+	const alertItem = computed<BudgetAlert | null>(() => {
+		if (ledger.alerts.length == 0) return null
+		return ledger.alerts[0]
+	})
+
+	const alertTitle = computed(() : string => {
+		const alert = alertItem.value
+		if (alert == null) return ''
+		const name = alert.categoryId == 'all' ? t('budgets.totalName') : categoryName(alert.categoryId, prefs.locale)
+		return t('home.alertBanner') + ' · ' + name
+	})
+
+	const alertSub = computed(() : string => {
+		const alert = alertItem.value
+		if (alert == null) return ''
+		const prefix = alert.percent >= 100 ? t('alert.over') : t('alert.near')
+		return prefix + ' ' + formatPercent(alert.percent) + ' · ' + formatCurrency(alert.spent, alert.currency, prefs.locale)
+	})
+
+	function prevMonth() : void {
+		setMonth(addMonthsKey(ledger.currentMonth, -1))
+	}
+
+	function nextMonth() : void {
+		setMonth(addMonthsKey(ledger.currentMonth, 1))
+	}
+
+	function addEntry() : void {
+		uni.navigateTo({
+			url: '/pages/record-edit/record-edit'
+		})
+	}
+
+	function openTx(id : string) : void {
+		uni.navigateTo({
+			url: '/pages/record-edit/record-edit?id=' + id
+		})
+	}
+
+	function goRecords() : void {
+		uni.redirectTo({
+			url: '/pages/records/records'
+		})
+	}
+
+	function goDebts() : void {
+		uni.navigateTo({
+			url: '/pages/debts/debts'
+		})
+	}
+
+	function goBudgets() : void {
+		uni.redirectTo({
+			url: '/pages/budgets/budgets'
+		})
+	}
+
+	function goSettings() : void {
+		uni.navigateTo({
+			url: '/pages/settings/settings'
+		})
+	}
+
+	function dismissTopAlert() : void {
+		const alert = alertItem.value
+		if (alert != null) {
+			dismissAlert(alert.budgetId)
+		}
+	}
+
+	function retryLoad() : void {
+		loadLedger(true)
+	}
+</script>
+
+<style>
+	.topbar {
+		height: 52px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.brand {
+		font-size: 20px;
+		font-weight: 800;
+		letter-spacing: -0.6px;
+		margin-left: 8px;
+		color: #F2F6F1;
+	}
+
+	.avatar {
+		margin-left: 8px;
+	}
+
+	.hello-block {
+		margin-top: 14px;
+		flex-direction: column;
+	}
+
+	.hello-title {
+		font-size: 27px;
+		font-weight: 800;
+		letter-spacing: -0.8px;
+		color: #F2F6F1;
+	}
+
+	.hero-subtitle {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		margin-top: 5px;
+	}
+
+	.month-row {
+		margin-top: 18px;
+	}
+
+	.month-hint {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.month-hint-text {
+		font-size: 11px;
+		color: rgba(234,242,237,0.56);
+		margin-left: 6px;
+	}
+
+	.hero {
+		margin-top: 12px;
+		background-color: rgba(17,24,20,0.64);
+		background-image: radial-gradient(125% 115% at 94% -12%, rgba(123,231,191,0.26) 0%, rgba(123,231,191,0.07) 42%, rgba(255,255,255,0.02) 68%, rgba(255,255,255,0.055) 100%);
+		border-radius: 28px;
+		padding: 22px;
+		overflow: hidden;
+		position: relative;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.18), inset 0 1px 0 rgba(255,255,255,0.24), 0 22px 48px rgba(0,0,0,0.50);
+	}
+
+	.hero-orbit {
+		position: absolute;
+		width: 190px;
+		height: 190px;
+		border-radius: 95px;
+		border-width: 1px;
+		border-style: solid;
+		border-color: rgba(244, 240, 232, 0.09);
+		right: -60px;
+		top: -74px;
+	}
+
+	.hero-orbit-2 {
+		width: 124px;
+		height: 124px;
+		right: -22px;
+		top: -30px;
+		border-color: rgba(117, 199, 160, 0.2);
+	}
+
+	.hero-label {
+		font-size: 11px;
+		color: rgba(244, 240, 232, 0.62);
+		letter-spacing: 0.2px;
+	}
+
+	.hero-count {
+		height: 24px;
+		border-radius: 12px;
+		background-color: rgba(244, 240, 232, 0.1);
+		padding-left: 10px;
+		padding-right: 10px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.hero-count-text {
+		font-size: 9px;
+		color: rgba(244, 240, 232, 0.72);
+	}
+
+	.hero-amount {
+		font-size: 38px;
+		font-weight: 800;
+		color: #F4F1E9;
+		letter-spacing: -1.4px;
+		margin-top: 10px;
+	}
+
+	.hero-stats {
+		margin-top: 18px;
+	}
+
+	.hero-stat {
+		flex: 1;
+		flex-direction: column;
+	}
+
+	.hero-stat-right {
+		border-left-width: 1px;
+		border-left-style: solid;
+		border-left-color: rgba(244, 240, 232, 0.1);
+		padding-left: 18px;
+		margin-left: 18px;
+	}
+
+	.hero-stat-label {
+		font-size: 10px;
+		color: rgba(244, 240, 232, 0.5);
+		margin-left: 6px;
+	}
+
+	.hero-stat-value {
+		font-size: 17px;
+		font-weight: 700;
+		color: #F4F1E9;
+		margin-top: 6px;
+	}
+
+	.hero-line {
+		height: 1px;
+		background-color: rgba(244, 240, 232, 0.1);
+		margin-top: 18px;
+		margin-bottom: 13px;
+	}
+
+	.hero-foot {
+		font-size: 10px;
+		color: rgba(244, 240, 232, 0.52);
+	}
+
+	.hero-cta {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.hero-cta-icon {
+		width: 26px;
+		height: 26px;
+		border-radius: 9px;
+		background-color: #A9EDCB;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.hero-plus {
+		width: 14px;
+		height: 14px;
+	}
+
+	.hero-cta-text {
+		font-size: 11px;
+		font-weight: 700;
+		color: #A9EDCB;
+		margin-left: 7px;
+	}
+
+	.debt-row {
+		flex-direction: row;
+		margin-top: 12px;
+	}
+
+	.debt-card {
+		flex: 1;
+		background-color: rgba(255,255,255,0.045);
+		background-image: linear-gradient(155deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.025) 55%, rgba(255,255,255,0.06) 100%);
+		border-radius: 22px;
+		padding: 15px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.16), 0 12px 28px rgba(0,0,0,0.40);
+		flex-direction: column;
+	}
+
+	.debt-card-right {
+		margin-left: 10px;
+	}
+
+	.debt-icon {
+		width: 32px;
+		height: 32px;
+		border-radius: 11px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.debt-icon-in {
+		background-color: rgba(123,231,191,0.12);
+	}
+
+	.debt-icon-out {
+		background-color: rgba(240,160,106,0.12);
+	}
+
+	.debt-arrow {
+		width: 14px;
+		height: 14px;
+		opacity: 0.4;
+	}
+
+	.debt-label {
+		font-size: 10px;
+		color: rgba(234,242,237,0.52);
+		margin-top: 12px;
+	}
+
+	.debt-amount {
+		font-size: 18px;
+		font-weight: 750;
+		color: #F2F6F1;
+		margin-top: 4px;
+		letter-spacing: -0.3px;
+	}
+
+	.debt-sub {
+		font-size: 9px;
+		color: rgba(234,242,237,0.38);
+		margin-top: 3px;
+	}
+
+	.alert-home {
+		margin-top: 12px;
+	}
+
+	.alert-title {
+		font-size: 11px;
+		font-weight: 700;
+		color: #F3B07C;
+	}
+
+	.alert-sub {
+		font-size: 10px;
+		color: #E9A879;
+		margin-top: 3px;
+	}
+
+	.alert-close {
+		width: 26px;
+		height: 26px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.alert-close-icon {
+		width: 12px;
+		height: 12px;
+		opacity: 0.5;
+	}
+
+	.trend-total {
+		height: 26px;
+		border-radius: 13px;
+		background-color: rgba(255,255,255,0.06);
+		padding-left: 10px;
+		padding-right: 10px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+	}
+
+	.trend-total-text {
+		font-size: 11px;
+		font-weight: 700;
+		color: #F2F6F1;
+	}
+
+	.link-arrow {
+		width: 11px;
+		height: 11px;
+		margin-left: 2px;
+		opacity: 0.6;
+	}
+
+	.recent-empty {
+		padding-top: 24px;
+		padding-bottom: 18px;
+		align-items: center;
+	}
+
+	.recent-empty-text {
+		font-size: 12px;
+		color: rgba(234,242,237,0.38);
+	}
+
+	.onboarding-card {
+		margin-top: 12px;
+		background-color: rgba(255,255,255,0.045);
+		background-image: linear-gradient(150deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.028) 46%, rgba(255,255,255,0.06) 100%);
+		border-radius: 26px;
+		padding: 20px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.18), 0 16px 36px rgba(0,0,0,0.42);
+	}
+
+	.onboarding-head {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.onboarding-badge {
+		height: 24px;
+		border-radius: 12px;
+		background-color: rgba(123,231,191,0.10);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 9px;
+		padding-right: 9px;
+	}
+
+	.onboarding-badge-icon {
+		width: 12px;
+		height: 12px;
+	}
+
+	.onboarding-badge-text {
+		font-size: 9px;
+		color: #8FE3BC;
+		font-weight: 650;
+		margin-left: 5px;
+	}
+
+	.onboarding-logo {
+		width: 34px;
+		height: 34px;
+		border-radius: 11px;
+	}
+
+	.onboarding-title {
+		font-size: 21px;
+		font-weight: 800;
+		letter-spacing: -0.5px;
+		color: #F2F6F1;
+		margin-top: 15px;
+	}
+
+	.onboarding-sub {
+		font-size: 12px;
+		color: rgba(234,242,237,0.55);
+		line-height: 19px;
+		margin-top: 7px;
+		max-width: 290px;
+	}
+
+	.onboarding-btn {
+		margin-top: 16px;
+		height: 46px;
+		border-radius: 15px;
+		flex-direction: row;
+	}
+
+	.onboarding-btn-icon {
+		width: 15px;
+		height: 15px;
+		margin-left: 6px;
+		opacity: 0.6;
+	}
+
+	.budget-numbers {
+		margin-top: 16px;
+	}
+
+	.budget-spent {
+		font-size: 22px;
+		font-weight: 800;
+		color: #F2F6F1;
+		letter-spacing: -0.5px;
+	}
+
+	.budget-of {
+		font-size: 11px;
+		color: rgba(234,242,237,0.46);
+		margin-left: 5px;
+		margin-bottom: 3px;
+	}
+
+	.budget-percent {
+		font-size: 11px;
+		font-weight: 700;
+		color: #8FE3BC;
+		margin-left: auto;
+		margin-bottom: 3px;
+	}
+
+	.budget-track {
+		height: 8px;
+		border-radius: 4px;
+		background-color: rgba(255,255,255,0.08);
+		margin-top: 10px;
+		overflow: hidden;
+	}
+
+	.budget-fill {
+		height: 8px;
+		border-radius: 4px;
+		background-color: #6FE0B2;
+	}
+
+	.budget-fill-over {
+		background-color: #F0A06A;
+	}
+
+	.budget-left {
+		font-size: 10px;
+		color: rgba(234,242,237,0.52);
+	}
+
+	.budget-threshold {
+		font-size: 9px;
+		color: rgba(234,242,237,0.38);
+		margin-left: 5px;
+	}
+
+	.budget-threshold-dot {
+		width: 4px;
+		height: 4px;
+		border-radius: 2px;
+		background-color: rgba(255,255,255,0.16);
+	}
+
+	.budget-preview-list {
+		margin-top: 12px;
+		border-top-width: 1px;
+		border-top-style: solid;
+		border-top-color: rgba(255,255,255,0.09);
+		padding-top: 2px;
+	}
+
+	.budget-preview-row {
+		flex-direction: row;
+		align-items: center;
+		padding-top: 8px;
+		padding-bottom: 4px;
+	}
+
+	.budget-preview-dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 4px;
+	}
+
+	.budget-preview-name {
+		font-size: 10px;
+		color: rgba(234,242,237,0.64);
+		margin-left: 7px;
+		width: 62px;
+	}
+
+	.budget-mini-track {
+		flex: 1;
+		height: 5px;
+		border-radius: 3px;
+		background-color: rgba(255,255,255,0.08);
+		overflow: hidden;
+		margin-left: 4px;
+	}
+
+	.budget-mini-fill {
+		height: 5px;
+		border-radius: 3px;
+	}
+
+	.budget-preview-percent {
+		font-size: 9px;
+		color: rgba(234,242,237,0.52);
+		margin-left: 8px;
+		width: 34px;
+		text-align: right;
+	}
+
+	.budget-cta {
+		background-color: rgba(255,255,255,0.045);
+		background-image: linear-gradient(155deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.025) 55%, rgba(255,255,255,0.06) 100%);
+		border-radius: 22px;
+		padding: 16px;
+		flex-direction: row;
+		align-items: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.16), 0 12px 28px rgba(0,0,0,0.40);
+	}
+
+	.budget-cta-icon {
+		width: 42px;
+		height: 42px;
+		border-radius: 14px;
+		background-color: rgba(123,231,191,0.12);
+		align-items: center;
+		justify-content: center;
+		margin-right: 12px;
+	}
+
+	.budget-cta-title {
+		font-size: 13px;
+		font-weight: 700;
+		color: #F2F6F1;
+	}
+
+	.budget-cta-sub {
+		font-size: 10px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 3px;
+	}
+
+	.budget-cta-btn {
+		height: 30px;
+		border-radius: 10px;
+		background-color: rgba(123,231,191,0.14);
+		padding-left: 10px;
+		padding-right: 10px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.20);
+	}
+
+	.budget-cta-btn-text {
+		font-size: 9px;
+		color: #A9EDCB;
+		font-weight: 650;
+	}
+
+	.loading-text {
+		font-size: 12px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 14px;
+	}
+
+	.loading-retry {
+		margin-top: 12px;
+	}
+</style>

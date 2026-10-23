@@ -1,0 +1,909 @@
+<template>
+	<view class="page">
+		<aurora-bg level="low" />
+		<view class="status-spacer"></view>
+		<view class="page-content">
+			<view class="topbar enter-fade">
+				<view class="icon-btn" @click="goBack">
+					<image class="icon-18" src="/static/icons/ui-back-light.png" />
+				</view>
+				<view class="head-center">
+					<text class="page-title">{{ pageTitle }}</text>
+					<text class="page-sub">{{ t('home.subtitle') }}</text>
+				</view>
+				<view v-if="isEditing && !linked" class="icon-btn" @click="askDelete">
+					<image class="icon-18" src="/static/icons/ui-trash-light.png" />
+				</view>
+				<view v-else class="icon-btn-space"></view>
+			</view>
+
+			<view v-if="linked" class="linked-banner enter-rise enter-d1">
+				<view class="linked-icon">
+					<image class="icon-18" src="/static/icons/ui-shield-light.png" />
+				</view>
+				<view class="grow">
+					<text class="linked-title">{{ t('recordEdit.linkedTitle') }}</text>
+					<text class="linked-sub">{{ t('recordEdit.linkedHint') }}</text>
+				</view>
+			</view>
+
+			<view class="type-switch enter-rise enter-d1">
+				<view :class="type == 'expense' ? 'type-item type-item-active' : 'type-item'" @click="setType('expense')">
+					<view :class="type == 'expense' ? 'dot dot-orange' : 'dot dot-muted'"></view>
+					<text :class="type == 'expense' ? 'type-text type-text-active' : 'type-text'">{{ t('recordEdit.expense') }}</text>
+				</view>
+				<view :class="type == 'income' ? 'type-item type-item-active' : 'type-item'" @click="setType('income')">
+					<view :class="type == 'income' ? 'dot dot-mint' : 'dot dot-muted'"></view>
+					<text :class="type == 'income' ? 'type-text type-text-active' : 'type-text'">{{ t('recordEdit.income') }}</text>
+				</view>
+			</view>
+
+			<view class="amount-card enter-pop enter-d2">
+				<view class="amount-orbit"></view>
+				<view class="row justify-between items-center">
+					<text class="amount-label">{{ t('recordEdit.amount') }}</text>
+					<view class="currency-chip" @click="openCurrency">
+						<text class="currency-chip-code">{{ currency }}</text>
+						<image class="currency-chip-icon" src="/static/icons/ui-down.png" />
+					</view>
+				</view>
+				<view class="row items-end amount-line">
+					<text class="amount-symbol">{{ currencySymbol }}</text>
+					<input
+						class="amount-input"
+						type="digit"
+						:value="amountText"
+						:disabled="linked"
+						placeholder="0"
+						placeholder-class="amount-placeholder"
+						@input="onAmountInput"
+					/>
+				</view>
+				<text class="converted-hint">{{ convertedHint }}</text>
+			</view>
+
+			<view class="section-head enter-rise enter-d3">
+				<text class="section-title">{{ t('recordEdit.category') }}</text>
+				<text class="section-value">{{ selectedCategoryName }}</text>
+			</view>
+			<view class="card cat-card enter-rise enter-d3">
+				<view class="row wrap">
+					<view v-for="cat in categories" :key="cat.id" class="cat-item" @click="chooseCategory(cat.id)">
+						<view class="cat-tile-wrap">
+							<view class="cat-tile" :style="'background-color: ' + cat.color + '2E'">
+								<image class="cat-icon" :src="categoryIconPath(cat.id)" />
+							</view>
+							<view v-if="categoryId == cat.id" class="cat-check">
+								<image class="cat-check-icon" src="/static/icons/ui-check.png" />
+							</view>
+						</view>
+						<text :class="categoryId == cat.id ? 'cat-name cat-name-active' : 'cat-name'">{{ categoryName(cat.id, prefs.locale) }}</text>
+					</view>
+				</view>
+			</view>
+
+			<view class="section-head enter-rise enter-d3">
+				<text class="section-title">{{ t('common.note') }}</text>
+			</view>
+			<view class="card detail-card enter-rise enter-d4">
+				<picker class="detail-picker" mode="date" :value="dateValue" @change="onDateChange">
+					<view class="detail-row">
+						<view class="detail-icon">
+							<image class="icon-18" src="/static/icons/ui-calendar-light.png" />
+						</view>
+						<text class="detail-label">{{ t('common.date') }}</text>
+						<text class="detail-value">{{ dateDisplay }}</text>
+						<image class="detail-arrow" src="/static/icons/ui-right-light.png" />
+					</view>
+				</picker>
+				<view class="divider"></view>
+				<view class="detail-row">
+					<view class="detail-icon">
+						<image class="icon-18" src="/static/icons/ui-edit-light.png" />
+					</view>
+					<text class="detail-label">{{ t('common.note') }}</text>
+					<input
+						class="detail-input"
+						:value="note"
+						:disabled="linked"
+						:placeholder="t('recordEdit.notePh')"
+						placeholder-class="detail-placeholder"
+						@input="onNoteInput"
+					/>
+				</view>
+			</view>
+
+			<view v-if="!linked" :class="saving ? 'btn btn-mint save-btn save-btn-busy enter-rise enter-d5' : 'btn btn-mint save-btn enter-rise enter-d5'" hover-class="pressed" @click="save">
+				<image v-if="!saving" class="save-icon" src="/static/icons/ui-check.png" />
+				<text class="btn-mint-text">{{ saving ? t('common.loading') : t('recordEdit.save') }}</text>
+			</view>
+
+			<view v-if="isEditing && !linked" class="delete-row" @click="askDelete">
+				<image class="delete-icon" src="/static/icons/ui-trash-light.png" />
+				<text class="delete-text">{{ t('recordEdit.delete') }}</text>
+			</view>
+
+			<view class="bottom-space"></view>
+		</view>
+
+		<view v-if="currencyOpen" class="modal-mask" @click="closeCurrency">
+			<view class="sheet currency-sheet" @click.stop>
+				<view class="sheet-handle"></view>
+				<text class="sheet-title">{{ t('sheet.currencyTitle') }}</text>
+				<view v-for="item in currencies" :key="item.code" class="currency-row" @click="pickCurrency(item.code)">
+					<view class="currency-badge">
+						<text class="currency-badge-symbol">{{ item.symbol }}</text>
+					</view>
+					<view class="grow currency-info">
+						<text class="currency-name">{{ currencyName(item.code, prefs.locale) }}</text>
+						<text class="currency-code">{{ item.code }}</text>
+					</view>
+					<view v-if="currency == item.code" class="currency-check">
+						<image class="currency-check-icon" src="/static/icons/ui-check.png" />
+					</view>
+				</view>
+			</view>
+		</view>
+
+		<view v-if="deleteOpen" class="modal-mask modal-mask-center">
+			<view class="dialog">
+				<view class="dialog-icon">
+					<image class="icon-20" src="/static/icons/ui-trash-light.png" />
+				</view>
+				<text class="dialog-title">{{ t('recordEdit.deleteTitle') }}</text>
+				<text class="dialog-msg">{{ t('recordEdit.deleteMsg') }}</text>
+				<view class="row dialog-actions">
+					<view class="dialog-btn dialog-btn-ghost" @click="closeDelete">
+						<text class="dialog-btn-ghost-text">{{ t('common.cancel') }}</text>
+					</view>
+					<view class="dialog-btn dialog-btn-danger" @click="confirmDelete">
+						<text class="dialog-btn-danger-text">{{ t('common.delete') }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, ref, watch } from 'vue'
+	import AuroraBg from '@/components/aurora-bg.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs } from '@/stores/prefs.uts'
+	import { session } from '@/stores/session.uts'
+	import { ledger, ensureLoaded, findTransaction, saveTx, removeTx } from '@/stores/ledger.uts'
+	import { CategoryDef, CurrencyDef, Transaction, TransactionInput } from '@/types/models.uts'
+	import { CURRENCIES, currencyByCode, currencyName } from '@/constants/currencies.uts'
+	import { categoriesOf, categoryName, categoryIconPath } from '@/constants/categories.uts'
+	import { dateLabelWithWeek, nextDaysTs, parseDateInput, toDateInput } from '@/utils/date.uts'
+	import { convertAmount, formatCurrency, parseAmount, trimAmountInput } from '@/utils/money.uts'
+
+	const type = ref('expense')
+	const amountText = ref('')
+	const currency = ref(prefs.baseCurrency)
+	const categoryId = ref(categoriesOf('expense')[0].id)
+	const dateTs = ref(nextDaysTs(0))
+	const note = ref('')
+	const saving = ref(false)
+	const currencyOpen = ref(false)
+	const deleteOpen = ref(false)
+	const editId = ref('')
+	const hydrated = ref(false)
+
+	const currencies = computed<Array<CurrencyDef>>(() => {
+		return CURRENCIES
+	})
+
+	const categories = computed<Array<CategoryDef>>(() => {
+		return categoriesOf(type.value)
+	})
+
+	const isEditing = computed(() : boolean => {
+		return editId.value.length > 0
+	})
+
+	const linked = computed(() : boolean => {
+		if (editId.value.length == 0) return false
+		const tx = findTransaction(editId.value)
+		if (tx == null) return false
+		return tx.sourceDebtId.length > 0
+	})
+
+	const pageTitle = computed(() : string => {
+		return isEditing.value ? t('recordEdit.editTitle') : t('recordEdit.newTitle')
+	})
+
+	const selectedCategoryName = computed(() : string => {
+		return categoryName(categoryId.value, prefs.locale)
+	})
+
+	const currencySymbol = computed(() : string => {
+		return currencyByCode(currency.value).symbol
+	})
+
+	const dateValue = computed(() : string => {
+		return toDateInput(dateTs.value)
+	})
+
+	const dateDisplay = computed(() : string => {
+		return dateLabelWithWeek(dateTs.value, prefs.locale)
+	})
+
+	const convertedHint = computed(() : string => {
+		const amount = parseAmount(amountText.value)
+		if (amount <= 0) return t('recordEdit.currencyHint')
+		if (currency.value == prefs.baseCurrency) return t('recordEdit.currencyHint')
+		const converted = convertAmount(amount, currency.value, prefs.baseCurrency, prefs.rates)
+		return t('recordEdit.converted') + ' ' + formatCurrency(converted, prefs.baseCurrency, prefs.locale) + ' ' + prefs.baseCurrency
+	})
+
+	onLoad((options : OnLoadOptions) => {
+		const raw = options.getString('id')
+		if (raw != null && raw.length > 0) {
+			editId.value = raw
+		}
+	})
+
+	onPageShow(() => {
+		if (!session.isLoggedIn) {
+			uni.reLaunch({
+				url: '/pages/login/login'
+			})
+			return
+		}
+		ensureLoaded()
+		hydrate()
+	})
+
+	onMounted(() => {
+		hydrate()
+	})
+
+	watch(() => ledger.loaded, (loaded : boolean) => {
+		if (loaded) hydrate()
+	})
+
+	function hydrate() : void {
+		if (hydrated.value) return
+		if (editId.value.length == 0) {
+			hydrated.value = true
+			return
+		}
+		if (!ledger.loaded) return
+		const tx = findTransaction(editId.value)
+		if (tx != null) {
+			type.value = tx.type
+			amountText.value = trimAmountInput(tx.amount.toString())
+			currency.value = tx.currency
+			categoryId.value = tx.categoryId
+			dateTs.value = tx.date
+			note.value = tx.note
+		} else {
+			uni.showToast({
+				title: t('common.networkError'),
+				icon: 'none'
+			})
+		}
+		hydrated.value = true
+	}
+
+	function setType(next : string) : void {
+		if (linked.value) return
+		if (type.value == next) return
+		type.value = next
+		categoryId.value = categoriesOf(next)[0].id
+	}
+
+	function chooseCategory(id : string) : void {
+		if (linked.value) return
+		categoryId.value = id
+	}
+
+	function onAmountInput(event : UniInputEvent) : void {
+		amountText.value = trimAmountInput(event.detail.value)
+	}
+
+	function onNoteInput(event : UniInputEvent) : void {
+		note.value = event.detail.value
+	}
+
+	function onDateChange(event : UniPickerChangeEvent) : void {
+		dateTs.value = parseDateInput(event.detail.value as string)
+	}
+
+	function openCurrency() : void {
+		if (linked.value) return
+		currencyOpen.value = true
+	}
+
+	function closeCurrency() : void {
+		currencyOpen.value = false
+	}
+
+	function pickCurrency(code : string) : void {
+		currency.value = code
+		currencyOpen.value = false
+	}
+
+	function askDelete() : void {
+		deleteOpen.value = true
+	}
+
+	function closeDelete() : void {
+		deleteOpen.value = false
+	}
+
+	async function save() : Promise<void> {
+		if (saving.value || linked.value) return
+		const amount = parseAmount(amountText.value)
+		if (amount <= 0) {
+			uni.showToast({
+				title: t('recordEdit.validationAmount'),
+				icon: 'none'
+			})
+			return
+		}
+		saving.value = true
+		const input : TransactionInput = {
+			id: editId.value,
+			type: type.value,
+			amount: amount,
+			currency: currency.value,
+			categoryId: categoryId.value,
+			note: note.value,
+			date: dateTs.value
+		}
+		try {
+			await saveTx(input)
+			uni.showToast({
+				title: t('recordEdit.saved'),
+				icon: 'success'
+			})
+			setTimeout(() => {
+				uni.navigateBack({
+					delta: 1
+				})
+			}, 380)
+		} catch (e) {
+			saving.value = false
+			uni.showModal({
+				content: t('common.saveFailed'),
+				showCancel: false
+			})
+		}
+	}
+
+	async function confirmDelete() : Promise<void> {
+		deleteOpen.value = false
+		const id = editId.value
+		if (id.length == 0) return
+		try {
+			await removeTx(id)
+			uni.navigateBack({
+				delta: 1
+			})
+		} catch (e) {
+			uni.showModal({
+				content: t('common.deleteFailed'),
+				showCancel: false
+			})
+		}
+	}
+
+	function goBack() : void {
+		uni.navigateBack({
+			delta: 1,
+			fail: () => {
+				uni.reLaunch({
+					url: '/pages/shell/shell'
+				})
+			}
+		})
+	}
+</script>
+
+<style>
+	.topbar {
+		height: 56px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.head-center {
+		flex: 1;
+		align-items: center;
+		flex-direction: column;
+	}
+
+	.page-title {
+		font-size: 17px;
+		font-weight: 750;
+		color: #F2F6F1;
+		letter-spacing: -0.2px;
+	}
+
+	.page-sub {
+		font-size: 10px;
+		color: rgba(234,242,237,0.40);
+		margin-top: 3px;
+	}
+
+	.icon-btn-space {
+		width: 38px;
+		height: 38px;
+	}
+
+	.linked-banner {
+		background-color: rgba(123,231,191,0.07);
+		border-radius: 18px;
+		padding: 12px 13px;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 12px;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.14);
+	}
+
+	.linked-icon {
+		width: 34px;
+		height: 34px;
+		border-radius: 11px;
+		background-color: rgba(123,231,191,0.12);
+		align-items: center;
+		justify-content: center;
+		margin-right: 11px;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.18);
+	}
+
+	.linked-title {
+		font-size: 11px;
+		font-weight: 700;
+		color: #F2F6F1;
+	}
+
+	.linked-sub {
+		font-size: 10px;
+		color: rgba(234,242,237,0.52);
+		margin-top: 3px;
+		line-height: 15px;
+	}
+
+	.type-switch {
+		height: 48px;
+		border-radius: 16px;
+		background-color: rgba(255,255,255,0.045);
+		padding: 4px;
+		flex-direction: row;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.10);
+	}
+
+	.type-item {
+		flex: 1;
+		border-radius: 12px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.type-item-active {
+		background-color: rgba(255,255,255,0.14);
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.18);
+	}
+
+	.type-text {
+		font-size: 13px;
+		font-weight: 600;
+		color: rgba(234,242,237,0.56);
+		margin-left: 7px;
+	}
+
+	.type-text-active {
+		color: #F4F1E9;
+		font-weight: 700;
+	}
+
+	.dot-muted {
+		background-color: rgba(255,255,255,0.16);
+	}
+
+	.amount-card {
+		margin-top: 12px;
+		background-color: rgba(17,24,20,0.64);
+		background-image: radial-gradient(125% 115% at 94% -12%, rgba(123,231,191,0.24) 0%, rgba(123,231,191,0.06) 42%, rgba(255,255,255,0.02) 68%, rgba(255,255,255,0.05) 100%);
+		border-radius: 28px;
+		padding: 19px 20px 17px 20px;
+		overflow: hidden;
+		position: relative;
+		flex-direction: column;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.17), inset 0 1px 0 rgba(255,255,255,0.22), 0 22px 48px rgba(0,0,0,0.48);
+	}
+
+	.amount-orbit {
+		position: absolute;
+		width: 170px;
+		height: 170px;
+		border-radius: 85px;
+		border-width: 1px;
+		border-style: solid;
+		border-color: rgba(244, 240, 232, 0.08);
+		right: -52px;
+		top: -80px;
+	}
+
+	.amount-label {
+		font-size: 11px;
+		color: rgba(244, 240, 232, 0.58);
+		letter-spacing: 0.2px;
+	}
+
+	.currency-chip {
+		height: 30px;
+		border-radius: 15px;
+		background-color: #A9EDCB;
+		background-image: linear-gradient(160deg, #D6F8E6 0%, #A9EDCB 52%, #8FE3BC 100%);
+		padding-left: 11px;
+		padding-right: 9px;
+		flex-direction: row;
+		align-items: center;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 4px 12px rgba(143,227,188,0.2);
+	}
+
+	.currency-chip-code {
+		font-size: 11px;
+		font-weight: 750;
+		color: #0B2117;
+	}
+
+	.currency-chip-icon {
+		width: 11px;
+		height: 11px;
+		margin-left: 4px;
+		opacity: 0.7;
+	}
+
+	.amount-line {
+		margin-top: 6px;
+	}
+
+	.amount-symbol {
+		font-size: 24px;
+		font-weight: 700;
+		color: rgba(247, 243, 234, 0.7);
+		margin-bottom: 11px;
+		margin-right: 4px;
+	}
+
+	.amount-input {
+		flex: 1;
+		height: 64px;
+		font-size: 40px;
+		font-weight: 800;
+		color: #F4F1E9;
+		letter-spacing: -1.2px;
+	}
+
+	.amount-placeholder {
+		color: rgba(247, 243, 234, 0.22);
+	}
+
+	.converted-hint {
+		font-size: 10px;
+		color: rgba(244, 240, 232, 0.42);
+		margin-top: 5px;
+	}
+
+	.section-head {
+		margin-top: 20px;
+		margin-bottom: 9px;
+		padding-left: 4px;
+		padding-right: 4px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.section-title {
+		font-size: 15px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.section-value {
+		font-size: 11px;
+		color: #8FE3BC;
+		font-weight: 650;
+	}
+
+	.cat-card {
+		padding: 8px 4px 12px 4px;
+	}
+
+	.cat-item {
+		width: 25%;
+		align-items: center;
+		flex-direction: column;
+		padding-top: 8px;
+		padding-bottom: 4px;
+	}
+
+	.cat-tile-wrap {
+		width: 46px;
+		height: 46px;
+		position: relative;
+	}
+
+	.cat-tile {
+		width: 46px;
+		height: 46px;
+		border-radius: 15px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.cat-icon {
+		width: 22px;
+		height: 22px;
+	}
+
+	.cat-check {
+		position: absolute;
+		right: -3px;
+		top: -3px;
+		width: 17px;
+		height: 17px;
+		border-radius: 9px;
+		background-color: #A9EDCB;
+		border-width: 2px;
+		border-style: solid;
+		border-color: #0B120E;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+	}
+
+	.cat-check-icon {
+		width: 9px;
+		height: 9px;
+	}
+
+	.cat-name {
+		font-size: 10px;
+		color: rgba(234,242,237,0.56);
+		margin-top: 6px;
+	}
+
+	.cat-name-active {
+		color: #A9EDCB;
+		font-weight: 700;
+	}
+
+	.detail-card {
+		padding-top: 2px;
+		padding-bottom: 2px;
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+
+	.detail-picker {
+		width: 100%;
+	}
+
+	.detail-row {
+		height: 56px;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.detail-icon {
+		width: 32px;
+		height: 32px;
+		border-radius: 10px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+		margin-right: 11px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+	}
+
+	.detail-label {
+		font-size: 13px;
+		font-weight: 600;
+		color: #F2F6F1;
+	}
+
+	.detail-value {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		margin-left: auto;
+		margin-right: 4px;
+	}
+
+	.detail-arrow {
+		width: 12px;
+		height: 12px;
+		opacity: 0.45;
+	}
+
+	.detail-input {
+		flex: 1;
+		height: 50px;
+		font-size: 12px;
+		color: #F2F6F1;
+		text-align: right;
+		margin-left: 12px;
+	}
+
+	.detail-placeholder {
+		color: rgba(234,242,237,0.32);
+	}
+
+	.save-btn {
+		margin-top: 22px;
+		height: 54px;
+		border-radius: 17px;
+		flex-direction: row;
+	}
+
+	.save-btn-busy {
+		opacity: 0.65;
+	}
+
+	.save-icon {
+		width: 16px;
+		height: 16px;
+		margin-right: 7px;
+		opacity: 0.8;
+	}
+
+	.delete-row {
+		margin-top: 16px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		padding-top: 8px;
+		padding-bottom: 8px;
+	}
+
+	.delete-icon {
+		width: 14px;
+		height: 14px;
+		opacity: 0.55;
+	}
+
+	.delete-text {
+		font-size: 12px;
+		color: #F09783;
+		font-weight: 600;
+		margin-left: 6px;
+	}
+
+	.bottom-space {
+		height: calc(30px + var(--uni-safe-area-inset-bottom));
+	}
+
+	.sheet-title {
+		font-size: 16px;
+		font-weight: 750;
+		color: #F2F6F1;
+		text-align: center;
+		margin-top: 4px;
+		margin-bottom: 8px;
+	}
+
+	.currency-sheet {
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+
+	.currency-row {
+		flex-direction: row;
+		align-items: center;
+		padding-top: 10px;
+		padding-bottom: 10px;
+	}
+
+	.currency-badge {
+		width: 40px;
+		height: 40px;
+		border-radius: 13px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+	}
+
+	.currency-badge-symbol {
+		font-size: 15px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.currency-info {
+		margin-left: 12px;
+		flex-direction: column;
+	}
+
+	.currency-name {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.currency-code {
+		font-size: 10px;
+		color: rgba(234,242,237,0.40);
+		margin-top: 2px;
+	}
+
+	.currency-check {
+		width: 22px;
+		height: 22px;
+		border-radius: 11px;
+		background-color: #A9EDCB;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+	}
+
+	.currency-check-icon {
+		width: 11px;
+		height: 11px;
+	}
+
+	.dialog-icon {
+		width: 46px;
+		height: 46px;
+		border-radius: 15px;
+		background-color: rgba(240,110,86,0.12);
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 14px;
+		box-shadow: inset 0 0 0 1px rgba(240,110,86,0.16);
+	}
+
+	.dialog-title {
+		font-size: 17px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.dialog-msg {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		line-height: 19px;
+		margin-top: 8px;
+	}
+
+	.dialog-actions {
+		margin-top: 20px;
+	}
+
+	.dialog-btn {
+		flex: 1;
+		height: 46px;
+		border-radius: 14px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dialog-btn-ghost {
+		background-color: rgba(255,255,255,0.06);
+	}
+
+	.dialog-btn-ghost-text {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.dialog-btn-danger {
+		background-color: rgba(240,110,86,0.12);
+		margin-left: 10px;
+	}
+
+	.dialog-btn-danger-text {
+		font-size: 13px;
+		font-weight: 700;
+		color: #F08A70;
+	}
+</style>

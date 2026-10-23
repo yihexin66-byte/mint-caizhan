@@ -1,0 +1,181 @@
+<template>
+	<view class="donut-wrap" :style="'width: ' + props.size + 'px; height: ' + props.size + 'px;'">
+		<canvas
+			:id="canvasId"
+			type="2d"
+			class="donut-canvas"
+			:width="props.size"
+			:height="props.size"
+			:style="'width: ' + props.size + 'px; height: ' + props.size + 'px;'"
+		></canvas>
+		<view class="donut-center">
+			<text class="donut-value">{{ props.centerValue }}</text>
+			<text class="donut-label">{{ props.centerLabel }}</text>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { onMounted, watch, getCurrentInstance, PropType } from 'vue'
+	import { ChartSegment } from '@/types/models.uts'
+
+	defineOptions({
+		styleIsolation: 'app'
+	})
+
+	const props = defineProps({
+		segments: {
+			type: Array as PropType<Array<ChartSegment>>,
+			default: () : Array<ChartSegment> => [] as Array<ChartSegment>
+		},
+		size: {
+			type: Number,
+			default: 196
+		},
+		thickness: {
+			type: Number,
+			default: 18
+		},
+		centerValue: {
+			type: String,
+			default: ''
+		},
+		centerLabel: {
+			type: String,
+			default: ''
+		}
+	})
+
+	const canvasId = 'mint_donut_' + Math.floor(Math.random() * 1000000).toString()
+
+	function paint() : void {
+		uni.createCanvasContextAsync({
+			id: canvasId,
+			component: getCurrentInstance()?.proxy,
+			success: (context : CanvasContext) => {
+				const ctx = context.getContext('2d')
+				if (ctx == null) return
+				const size = props.size
+				// #ifdef WEB || MP-WEIXIN
+				// H5/微信小程序下 canvas 内部像素尺寸默认 300x150，需要按 dpr 同步，
+				// 否则绘制内容会被拉伸成椭圆；App 端尺寸只读，跳过。
+				const dpr = uni.getSystemInfoSync().pixelRatio
+				const canvas = ctx.canvas
+				canvas.width = Math.round(size * dpr)
+				canvas.height = Math.round(size * dpr)
+				ctx.scale(dpr, dpr)
+				// #endif
+				const center = size / 2
+				const radius = center - props.thickness / 2 - 1
+				ctx.clearRect(0, 0, size, size)
+				ctx.lineWidth = props.thickness
+
+				ctx.beginPath()
+				ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+				ctx.arc(center, center, radius, 0, Math.PI * 2)
+				ctx.stroke()
+
+				let total = 0
+				for (let i = 0; i < props.segments.length; i++) {
+					if (props.segments[i].value > 0) total += props.segments[i].value
+				}
+				if (total <= 0) return
+
+				const visibleCount = countVisible()
+				const gap = visibleCount > 1 ? 0.035 : 0
+				let angle = -Math.PI / 2
+				for (let i = 0; i < props.segments.length; i++) {
+					const segment = props.segments[i]
+					if (segment.value <= 0) continue
+					const sweep = segment.value / total * Math.PI * 2
+					const start = angle + gap / 2
+					const end = angle + sweep - gap / 2
+					if (end > start) {
+						ctx.beginPath()
+						ctx.strokeStyle = segment.color
+						ctx.arc(center, center, radius, start, end)
+						ctx.stroke()
+					}
+					angle += sweep
+				}
+			},
+			fail: (_ : UniError) => {
+				console.log('donut canvas failed')
+			}
+		})
+	}
+
+	function countVisible() : number {
+		let count = 0
+		for (let i = 0; i < props.segments.length; i++) {
+			if (props.segments[i].value > 0) count++
+		}
+		return count
+	}
+
+	onMounted(() => {
+		setTimeout(() => {
+			paint()
+		}, 60)
+	})
+
+	watch(() => props.segments, (_old, _new) => {
+		setTimeout(() => {
+			paint()
+		}, 30)
+	}, { deep: true })
+</script>
+
+<style>
+	@keyframes donutReveal {
+		from {
+			opacity: 0;
+			transform: scale(0.94);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	.donut-wrap {
+		position: relative;
+		align-items: center;
+		justify-content: center;
+		animation-name: donutReveal;
+		animation-duration: 620ms;
+		animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+		animation-fill-mode: backwards;
+		animation-delay: 120ms;
+	}
+
+	.donut-canvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+	}
+
+	.donut-center {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		align-items: center;
+		justify-content: center;
+		flex-direction: column;
+	}
+
+	.donut-value {
+		font-size: 22px;
+		font-weight: 800;
+		color: #F2F6F1;
+		letter-spacing: -0.5px;
+	}
+
+	.donut-label {
+		font-size: 10px;
+		color: rgba(234,242,237,0.40);
+		margin-top: 4px;
+	}
+</style>

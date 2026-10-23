@@ -1,0 +1,160 @@
+const MONTHS_EN : Array<string> = [
+	'January', 'February', 'March', 'April', 'May', 'June',
+	'July', 'August', 'September', 'October', 'November', 'December'
+]
+
+const MONTHS_EN_SHORT : Array<string> = [
+	'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+	'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+]
+
+export function pad2(value : number) : string {
+	return value < 10 ? '0' + value.toString() : value.toString()
+}
+
+export function monthKeyOf(ts : number) : string {
+	const d = new Date(ts)
+	return d.getFullYear().toString() + '-' + pad2(d.getMonth() + 1)
+}
+
+export function thisMonthKey() : string {
+	return monthKeyOf(Date.now())
+}
+
+export function todayStart() : number {
+	const now = new Date()
+	return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime()
+}
+
+export function monthStartTs(key : string) : number {
+	const parts = key.split('-')
+	if (parts.length < 2) return todayStart()
+	const year = parseInt(parts[0])
+	const month = parseInt(parts[1])
+	return new Date(year, month - 1, 1, 0, 0, 0, 0).getTime()
+}
+
+export function monthEndTs(key : string) : number {
+	const parts = key.split('-')
+	if (parts.length < 2) return Date.now()
+	const year = parseInt(parts[0])
+	const month = parseInt(parts[1])
+	return new Date(year, month, 1, 0, 0, 0, 0).getTime() - 1
+}
+
+export function daysInMonth(key : string) : number {
+	const parts = key.split('-')
+	if (parts.length < 2) return 30
+	const year = parseInt(parts[0])
+	const month = parseInt(parts[1])
+	return new Date(year, month, 0, 12, 0, 0, 0).getDate()
+}
+
+export function addMonthsKey(key : string, delta : number) : string {
+	const parts = key.split('-')
+	if (parts.length < 2) return thisMonthKey()
+	const year = parseInt(parts[0])
+	const month = parseInt(parts[1]) - 1
+	const absolute = year * 12 + month + delta
+	const newYear = Math.floor(absolute / 12)
+	const newMonth = absolute - newYear * 12
+	return newYear.toString() + '-' + pad2(newMonth + 1)
+}
+
+export function monthLabel(key : string, locale : string) : string {
+	const parts = key.split('-')
+	if (parts.length < 2) return key
+	const year = parseInt(parts[0])
+	const month = parseInt(parts[1])
+	if (locale == 'en') return MONTHS_EN[month - 1] + ' ' + year.toString()
+	return year.toString() + '年' + month.toString() + '月'
+}
+
+export function monthShortLabel(key : string, locale : string) : string {
+	const parts = key.split('-')
+	if (parts.length < 2) return key
+	const month = parseInt(parts[1])
+	if (locale == 'en') return MONTHS_EN_SHORT[month - 1]
+	return month.toString() + '月'
+}
+
+export function toDateInput(ts : number) : string {
+	const d = new Date(ts)
+	return d.getFullYear().toString() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
+}
+
+export function parseDateInput(value : string) : number {
+	const parts = value.split('-')
+	if (parts.length < 3) return Date.now()
+	const year = parseInt(parts[0])
+	const month = parseInt(parts[1])
+	const day = parseInt(parts[2])
+	return new Date(year, month - 1, day, 12, 0, 0, 0).getTime()
+}
+
+export function dateLabel(ts : number, locale : string) : string {
+	const d = new Date(ts)
+	if (locale == 'en') return MONTHS_EN_SHORT[d.getMonth()] + ' ' + d.getDate().toString()
+	return (d.getMonth() + 1).toString() + '月' + d.getDate().toString() + '日'
+}
+
+export function dateLabelWithWeek(ts : number, locale : string) : string {
+	const d = new Date(ts)
+	const weekZh : Array<string> = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+	const weekEn : Array<string> = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+	const week = locale == 'en' ? weekEn[d.getDay()] : weekZh[d.getDay()]
+	return dateLabel(ts, locale) + ' · ' + week
+}
+
+export function groupDateKey(ts : number) : string {
+	const d = new Date(ts)
+	return d.getFullYear().toString() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
+}
+
+export function friendlyDateLabel(ts : number, locale : string) : string {
+	const key = groupDateKey(ts)
+	const nowKey = groupDateKey(Date.now())
+	if (key == nowKey) return locale == 'en' ? 'Today' : '今天'
+	const yesterday = groupDateKey(Date.now() - 86400000)
+	if (key == yesterday) return locale == 'en' ? 'Yesterday' : '昨天'
+	return dateLabelWithWeek(ts, locale)
+}
+
+export function greetingKey(locale : string) : string {
+	const hour = new Date().getHours()
+	if (hour < 12) return 'greeting.morning'
+	if (hour < 18) return 'greeting.afternoon'
+	return 'greeting.evening'
+}
+
+export function daysUntil(dueTs : number) : number {
+	const due = new Date(dueTs)
+	const dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 0, 0, 0, 0).getTime()
+	return Math.round((dueStart - todayStart()) / 86400000)
+}
+
+export function dueLabel(dueTs : number, locale : string) : string {
+	const days = daysUntil(dueTs)
+	if (days < 0) {
+		const n = Math.abs(days).toString()
+		return locale == 'en' ? ('Overdue ' + n + 'd') : ('逾期 ' + n + ' 天')
+	}
+	if (days == 0) return locale == 'en' ? 'Due today' : '今天到期'
+	const n = days.toString()
+	return locale == 'en' ? ('In ' + n + ' days') : (n + ' 天后到期')
+}
+
+export function isOverdue(dueTs : number) : boolean {
+	return daysUntil(dueTs) < 0
+}
+
+export function weekBucketIndex(ts : number) : number {
+	const day = new Date(ts).getDate()
+	const index = Math.floor((day - 1) / 7)
+	return index > 4 ? 4 : index
+}
+
+export function nextDaysTs(days : number) : number {
+	const d = new Date()
+	return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days, 12, 0, 0, 0).getTime()
+}

@@ -1,0 +1,157 @@
+import {
+	Budget,
+	BudgetInput,
+	Debt,
+	DebtInput,
+	LoginResult,
+	RatesSnapshot,
+	Settings,
+	SettleResult,
+	Snapshot,
+	Transaction,
+	TransactionInput,
+	User
+} from '@/types/models.uts'
+import { CLOUD_OBJECT_NAME } from '@/constants/config.uts'
+import { session } from '@/stores/session.uts'
+
+const cloudObj : any = uniCloud.importObject(CLOUD_OBJECT_NAME, { customUI: true })
+
+function parseAs<T>(raw : any) : T {
+	return JSON.parse<T>(JSON.stringify(raw))!
+}
+
+function cloudError(error : any) : string {
+	if (error == null) return 'UNKNOWN'
+	try {
+		const obj = error as UTSJSONObject
+		const message = obj.getString('message')
+		if (message != null && message.length > 0) return message
+		const errMsg = obj.getString('errMsg')
+		if (errMsg != null && errMsg.length > 0) return errMsg
+	} catch (e) {
+		// 网络层异常等并非 UTSJSONObject，读不到字段时退回字符串描述
+	}
+	return error.toString()
+}
+
+export async function cloudLogin(code : string) : Promise<LoginResult> {
+	try {
+		const raw = await cloudObj.login(code)
+		return parseAs<LoginResult>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudUpdateProfile(nickname : string, avatar : string) : Promise<User> {
+	try {
+		const raw = await cloudObj.updateProfile(session.token, { nickname: nickname, avatar: avatar })
+		return parseAs<User>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudLatestRates() : Promise<RatesSnapshot> {
+	try {
+		const raw = await cloudObj.latestRates(session.token)
+		return parseAs<RatesSnapshot>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudFetchSnapshot() : Promise<Snapshot> {
+	try {
+		const raw = await cloudObj.bootstrap(session.token)
+		return parseAs<Snapshot>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudSaveTransaction(input : TransactionInput) : Promise<Transaction> {
+	try {
+		const raw = await cloudObj.saveTransaction(session.token, input)
+		return parseAs<Transaction>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudDeleteTransaction(id : string) : Promise<boolean> {
+	try {
+		const raw = await cloudObj.deleteTransaction(session.token, id)
+		const data = raw as UTSJSONObject
+		return data.getBoolean('ok') ?? false
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudSaveBudget(input : BudgetInput) : Promise<Budget> {
+	try {
+		const raw = await cloudObj.saveBudget(session.token, input)
+		return parseAs<Budget>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudDeleteBudget(id : string) : Promise<boolean> {
+	try {
+		const raw = await cloudObj.deleteBudget(session.token, id)
+		const data = raw as UTSJSONObject
+		return data.getBoolean('ok') ?? false
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudSaveDebt(input : DebtInput) : Promise<Debt> {
+	try {
+		const raw = await cloudObj.saveDebt(session.token, input)
+		return parseAs<Debt>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudSettleDebt(id : string) : Promise<SettleResult> {
+	try {
+		const raw = await cloudObj.settleDebt(session.token, id)
+		return parseAs<SettleResult>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudDeleteDebt(id : string) : Promise<boolean> {
+	try {
+		const raw = await cloudObj.deleteDebt(session.token, id)
+		const data = raw as UTSJSONObject
+		return data.getBoolean('ok') ?? false
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudSaveSettings(settings : Settings) : Promise<Settings> {
+	try {
+		const raw = await cloudObj.saveSettings(session.token, settings)
+		return parseAs<Settings>(raw)
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}
+
+export async function cloudRegisterSubscription(templateId : string, accepted : boolean) : Promise<boolean> {
+	try {
+		const raw = await cloudObj.registerSubscription(session.token, templateId, accepted)
+		const data = raw as UTSJSONObject
+		return data.getBoolean('ok') ?? false
+	} catch (e) {
+		throw new Error(cloudError(e))
+	}
+}

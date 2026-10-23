@@ -1,0 +1,301 @@
+import { reactive } from 'vue'
+import {
+	Budget,
+	BudgetAlert,
+	BudgetInput,
+	Debt,
+	DebtInput,
+	Settings,
+	SettleResult,
+	Transaction,
+	TransactionInput
+} from '@/types/models.uts'
+import {
+	deleteBudget,
+	deleteDebt,
+	deleteTransaction,
+	fetchSnapshot,
+	registerSubscription,
+	saveBudget,
+	saveDebt,
+	saveSettings,
+	saveTransaction,
+	settleDebt
+} from '@/services/api.uts'
+import { applyServerSettings, prefs, prefsSnapshot } from '@/stores/prefs.uts'
+import { session } from '@/stores/session.uts'
+import { collectBudgetAlerts } from '@/utils/stats.uts'
+import { monthKeyOf, thisMonthKey } from '@/utils/date.uts'
+
+export type LedgerState = {
+	transactions : Array<Transaction>
+	debts : Array<Debt>
+	budgets : Array<Budget>
+	alerts : Array<BudgetAlert>
+	dismissedAlerts : Array<string>
+	currentMonth : string
+	loading : boolean
+	loaded : boolean
+	syncing : boolean
+	error : string
+}
+
+export const ledger = reactive({
+	transactions: [] as Array<Transaction>,
+	debts: [] as Array<Debt>,
+	budgets: [] as Array<Budget>,
+	alerts: [] as Array<BudgetAlert>,
+	dismissedAlerts: [] as Array<string>,
+	currentMonth: thisMonthKey(),
+	loading: false,
+	loaded: false,
+	syncing: false,
+	error: ''
+} as LedgerState)
+
+function sortTransactions() : void {
+	const list = ledger.transactions
+	for (let i = 1; i < list.length; i++) {
+		const current = list[i]
+		let j = i - 1
+		while (j >= 0 && (list[j].date < current.date || (list[j].date == current.date && list[j].createdAt < current.createdAt))) {
+			list[j + 1] = list[j]
+			j--
+		}
+		list[j + 1] = current
+	}
+}
+
+function sortDebts() : void {
+	const list = ledger.debts
+	for (let i = 1; i < list.length; i++) {
+		const current = list[i]
+		let j = i - 1
+		while (j >= 0) {
+			const prev = list[j]
+			let shouldMove = false
+			if (prev.settled && !current.settled) {
+				shouldMove = true
+			} else if (prev.settled == current.settled && prev.dueDate > current.dueDate) {
+				shouldMove = true
+			}
+			if (!shouldMove) break
+			list[j + 1] = prev
+			j--
+		}
+		list[j + 1] = current
+	}
+}
+
+function rebuildAlerts() : void {
+	const all = collectBudgetAlerts(ledger.budgets, ledger.transactions, ledger.currentMonth)
+	const visible : Array<BudgetAlert> = []
+	for (let i = 0; i < all.length; i++) {
+		let dismissed = false
+		for (let j = 0; j < ledger.dismissedAlerts.length; j++) {
+			if (ledger.dismissedAlerts[j] == all[i].budgetId) dismissed = true
+		}
+		if (!dismissed) visible.push(all[i])
+	}
+	ledger.alerts = visible
+}
+
+export async function loadLedger(force : boolean) : Promise<void> {
+	if (ledger.loading) return
+	if (ledger.loaded && !force) return
+	ledger.loading = true
+	ledger.error = ''
+	try {
+		const snapshot = await fetchSnapshot()
+		ledger.transactions = snapshot.transactions
+		ledger.debts = snapshot.debts
+		ledger.budgets = snapshot.budgets
+		sortTransactions()
+		sortDebts()
+		ledger.loaded = true
+		if (!prefs.hasLocal) {
+			applyServerSettings(snapshot.settings)
+		}
+		rebuildAlerts()
+	} catch (e) {
+		ledger.error = 'LOAD_FAILED'
+	} finally {
+		ledger.loading = false
+	}
+}
+
+export function ensureLoaded() : void {
+	if (!ledger.loaded && !ledger.loading) {
+		loadLedger(false)
+	}
+}
+
+export function refreshLedger() : void {
+	loadLedger(true)
+}
+
+export function setMonth(key : string) : void {
+	ledger.currentMonth = key
+	rebuildAlerts()
+}
+
+export function resetLedger() : void {
+	ledger.transactions = []
+	ledger.debts = []
+	ledger.budgets = []
+	ledger.alerts = []
+	ledger.dismissedAlerts = []
+	ledger.currentMonth = thisMonthKey()
+	ledger.loaded = false
+	ledger.loading = false
+	ledger.error = ''
+}
+
+export function dismissAlert(budgetId : string) : void {
+	let exists = false
+	for (let i = 0; i < ledger.dismissedAlerts.length; i++) {
+		if (ledger.dismissedAlerts[i] == budgetId) exists = true
+	}
+	if (!exists) ledger.dismissedAlerts.push(budgetId)
+	rebuildAlerts()
+}
+
+export function findTransaction(id : string) : Transaction | null {
+	for (let i = 0; i < ledger.transactions.length; i++) {
+		if (ledger.transactions[i].id == id) return ledger.transactions[i]
+	}
+	return null
+}
+
+export function findDebt(id : string) : Debt | null {
+	for (let i = 0; i < ledger.debts.length; i++) {
+		if (ledger.debts[i].id == id) return ledger.debts[i]
+	}
+	return null
+}
+
+export function findBudget(id : string) : Budget | null {
+	for (let i = 0; i < ledger.budgets.length; i++) {
+		if (ledger.budgets[i].id == id) return ledger.budgets[i]
+	}
+	return null
+}
+
+export async function saveTx(input : TransactionInput) : Promise<Transaction> {
+	const saved = await saveTransaction(input)
+	let replaced = false
+	for (let i = 0; i < ledger.transactions.length; i++) {
+		if (ledger.transactions[i].id == saved.id) {
+			ledger.transactions[i] = saved
+			replaced = true
+			break
+		}
+	}
+	if (!replaced) ledger.transactions.push(saved)
+	sortTransactions()
+	ledger.currentMonth = monthKeyOf(saved.date)
+	rebuildAlerts()
+	return saved
+}
+
+export async function removeTx(id : string) : Promise<void> {
+	await deleteTransaction(id)
+	const next : Array<Transaction> = []
+	for (let i = 0; i < ledger.transactions.length; i++) {
+		if (ledger.transactions[i].id != id) next.push(ledger.transactions[i])
+	}
+	ledger.transactions = next
+	rebuildAlerts()
+}
+
+export async function saveBudgetItem(input : BudgetInput) : Promise<Budget> {
+	const saved = await saveBudget(input)
+	let replaced = false
+	for (let i = 0; i < ledger.budgets.length; i++) {
+		if (ledger.budgets[i].id == saved.id) {
+			ledger.budgets[i] = saved
+			replaced = true
+			break
+		}
+	}
+	if (!replaced) ledger.budgets.push(saved)
+	rebuildAlerts()
+	return saved
+}
+
+export async function removeBudget(id : string) : Promise<void> {
+	await deleteBudget(id)
+	const next : Array<Budget> = []
+	for (let i = 0; i < ledger.budgets.length; i++) {
+		if (ledger.budgets[i].id != id) next.push(ledger.budgets[i])
+	}
+	ledger.budgets = next
+	rebuildAlerts()
+}
+
+export async function saveDebtItem(input : DebtInput) : Promise<Debt> {
+	const saved = await saveDebt(input)
+	let replaced = false
+	for (let i = 0; i < ledger.debts.length; i++) {
+		if (ledger.debts[i].id == saved.id) {
+			ledger.debts[i] = saved
+			replaced = true
+			break
+		}
+	}
+	if (!replaced) ledger.debts.push(saved)
+	sortDebts()
+	return saved
+}
+
+export async function settleDebtItem(id : string) : Promise<SettleResult> {
+	const result = await settleDebt(id)
+	for (let i = 0; i < ledger.debts.length; i++) {
+		if (ledger.debts[i].id == result.debt.id) {
+			ledger.debts[i] = result.debt
+			break
+		}
+	}
+	let exists = false
+	for (let i = 0; i < ledger.transactions.length; i++) {
+		if (ledger.transactions[i].id == result.transaction.id) exists = true
+	}
+	if (!exists) ledger.transactions.push(result.transaction)
+	sortTransactions()
+	sortDebts()
+	ledger.currentMonth = monthKeyOf(result.transaction.date)
+	rebuildAlerts()
+	return result
+}
+
+export async function removeDebtItem(id : string) : Promise<void> {
+	await deleteDebt(id)
+	const next : Array<Debt> = []
+	for (let i = 0; i < ledger.debts.length; i++) {
+		if (ledger.debts[i].id != id) next.push(ledger.debts[i])
+	}
+	ledger.debts = next
+}
+
+export async function syncSettings() : Promise<boolean> {
+	if (!session.isLoggedIn) return false
+	try {
+		await saveSettings(prefsSnapshot())
+		return true
+	} catch (e) {
+		return false
+	}
+}
+
+export async function syncSubscription(templateId : string, accepted : boolean) : Promise<boolean> {
+	try {
+		await registerSubscription(templateId, accepted)
+		return true
+	} catch (e) {
+		return false
+	}
+}
+
+export function currentSettings() : Settings {
+	return prefsSnapshot()
+}

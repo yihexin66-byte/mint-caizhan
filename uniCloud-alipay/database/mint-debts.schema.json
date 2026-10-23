@@ -1,0 +1,57 @@
+{
+  "bsonType": "object",
+  "required": ["openid", "direction", "counterparty", "amount", "currency", "dueDate"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "往来记录 ID"
+    },
+    "openid": {
+      "bsonType": "string",
+      "description": "所属用户 openid"
+    },
+    "direction": {
+      "bsonType": "string",
+      "description": "receivable 应收 / payable 应付"
+    },
+    "counterparty": {
+      "bsonType": "string",
+      "description": "往来对象"
+    },
+    "amount": {
+      "bsonType": "number"
+    },
+    "currency": {
+      "bsonType": "string"
+    },
+    "dueDate": {
+      "bsonType": "number",
+      "description": "到期日时间戳"
+    },
+    "note": {
+      "bsonType": "string"
+    },
+    "settled": {
+      "bsonType": "bool",
+      "description": "是否已结清"
+    },
+    "settledAt": {
+      "bsonType": "number"
+    },
+    "linkedTxId": {
+      "bsonType": "string",
+      "description": "结清后自动生成的收支记录 ID"
+    },
+    "createdAt": {
+      "bsonType": "number"
+    },
+    "updatedAt": {
+      "bsonType": "number"
+    }
+  }
+}

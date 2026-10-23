@@ -1,0 +1,150 @@
+<template>
+	<view class="tx-row" hover-class="tx-pressed" @click="emitTap">
+		<view class="tx-icon-wrap" :style="'background-color: ' + categoryColor + '2E; box-shadow: inset 0 0 0 1px ' + categoryColor + '55'">
+			<image class="tx-icon" :src="categoryIconPath(props.tx.categoryId)" />
+		</view>
+		<view class="tx-main">
+			<text class="tx-title">{{ displayTitle }}</text>
+			<view class="tx-sub-row">
+				<text class="tx-sub">{{ categoryName(props.tx.categoryId, prefs.locale) }}</text>
+				<view class="tx-dot"></view>
+				<text class="tx-sub">{{ dateText }}</text>
+			</view>
+		</view>
+		<view class="tx-amount-wrap">
+			<text :class="props.tx.type == 'income' ? 'tx-amount amount-pos' : 'tx-amount amount-neg'">{{ amountText }}</text>
+			<text v-if="props.tx.sourceDebtId.length > 0" class="tx-linked">{{ t('debts.paid') }}</text>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, PropType } from 'vue'
+	import { Transaction } from '@/types/models.uts'
+	import { categoryById, categoryName, categoryIconPath } from '@/constants/categories.uts'
+	import { formatCurrency } from '@/utils/money.uts'
+	import { friendlyDateLabel } from '@/utils/date.uts'
+	import { prefs } from '@/stores/prefs.uts'
+	import { t } from '@/i18n/index.uts'
+
+	defineOptions({
+		styleIsolation: 'app'
+	})
+
+	const props = defineProps({
+		tx: {
+			type: Object as PropType<Transaction>,
+			required: true
+		},
+		showDate: {
+			type: Boolean,
+			default: true
+		}
+	})
+
+	const emit = defineEmits<{
+		(e : 'tap') : void
+	}>()
+
+	const categoryColor = computed(() : string => {
+		return categoryById(props.tx.categoryId).color
+	})
+
+	const displayTitle = computed(() : string => {
+		if (props.tx.note.length > 0) return props.tx.note
+		return categoryName(props.tx.categoryId, prefs.locale)
+	})
+
+	const dateText = computed(() : string => {
+		return friendlyDateLabel(props.tx.date, prefs.locale)
+	})
+
+	const amountText = computed(() : string => {
+		const sign = props.tx.type == 'income' ? '+' : '-'
+		return sign + formatCurrency(props.tx.amount, props.tx.currency, prefs.locale)
+	})
+
+	function emitTap() : void {
+		emit('tap')
+	}
+</script>
+
+<style>
+	.tx-row {
+		flex-direction: row;
+		align-items: center;
+		padding-top: 9px;
+		padding-bottom: 9px;
+		transition-property: opacity;
+		transition-duration: 110ms;
+	}
+
+	.tx-pressed {
+		opacity: 0.62;
+	}
+
+	.tx-icon-wrap {
+		width: 42px;
+		height: 42px;
+		border-radius: 14px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tx-icon {
+		width: 21px;
+		height: 21px;
+	}
+
+	.tx-main {
+		flex: 1;
+		margin-left: 12px;
+		flex-direction: column;
+	}
+
+	.tx-title {
+		font-size: 14px;
+		font-weight: 650;
+		color: #F2F6F1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.tx-sub-row {
+		flex-direction: row;
+		align-items: center;
+		margin-top: 4px;
+	}
+
+	.tx-sub {
+		font-size: 11px;
+		color: rgba(234,242,237,0.46);
+	}
+
+	.tx-dot {
+		width: 3px;
+		height: 3px;
+		border-radius: 2px;
+		background-color: rgba(255,255,255,0.18);
+		margin-left: 6px;
+		margin-right: 6px;
+	}
+
+	.tx-amount-wrap {
+		align-items: flex-end;
+		flex-direction: column;
+		margin-left: 8px;
+	}
+
+	.tx-amount {
+		font-size: 14px;
+		font-weight: 750;
+	}
+
+	.tx-linked {
+		font-size: 9px;
+		color: rgba(234,242,237,0.38);
+		margin-top: 2px;
+	}
+</style>

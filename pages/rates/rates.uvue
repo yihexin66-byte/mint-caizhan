@@ -1,0 +1,961 @@
+<template>
+	<view class="page">
+		<aurora-bg level="mid" />
+		<view class="status-spacer"></view>
+		<view class="page-content">
+			<view class="topbar enter-fade">
+				<view class="row items-center">
+					<view class="back-btn" @click="goBack">
+						<image class="icon-18" src="/static/icons/ui-back-light.png" />
+					</view>
+					<view class="head-left">
+						<text class="page-title">{{ t('rates.title') }}</text>
+						<text class="page-sub">{{ t('rates.subtitle') }}</text>
+					</view>
+				</view>
+				<view class="base-pill">
+					<text class="base-pill-text">{{ prefs.baseCurrency }}</text>
+				</view>
+			</view>
+
+			<view class="rate-hero enter-pop enter-d2">
+				<view class="hero-orbit"></view>
+				<view class="row justify-between items-center">
+					<view class="row items-center">
+						<view class="hero-tile">
+							<text class="hero-tile-text">¥</text>
+						</view>
+						<view class="hero-main">
+							<text class="hero-label">{{ t('rates.cnyBase') }}</text>
+							<text class="hero-sub">{{ currencyName('CNY', prefs.locale) }} · CNY</text>
+						</view>
+					</view>
+					<view class="hero-value-wrap">
+						<text class="hero-value">1.00</text>
+						<text class="hero-value-unit">{{ t('rates.unit') }}</text>
+					</view>
+				</view>
+				<view class="hero-divider"></view>
+				<view class="row justify-between items-center">
+					<text class="hero-quote">{{ cnyQuote }}</text>
+					<text class="hero-quote-label">{{ t('rates.fixed') }}</text>
+				</view>
+				<text class="hero-hint">{{ t('rates.hint') }}</text>
+			</view>
+
+			<view class="section-header enter-rise enter-d3">
+				<view>
+					<text class="section-title">{{ t('rates.current') }}</text>
+					<text class="section-sub">{{ ratesUpdatedText }}</text>
+				</view>
+				<view class="caption-tag">
+					<text class="caption-tag-text">CNY</text>
+				</view>
+			</view>
+
+			<view class="card rates-card enter-rise enter-d4">
+				<view v-for="(item, index) in rows" :key="item.code" class="rate-row">
+					<view class="rate-tile">
+						<text class="rate-symbol">{{ item.symbol }}</text>
+					</view>
+					<view class="grow rate-main">
+						<view class="row items-center">
+							<text class="rate-code">{{ item.code }}</text>
+							<view v-if="prefs.baseCurrency == item.code" class="base-tag">
+								<text class="base-tag-text">{{ t('settings.rateLocked') }}</text>
+							</view>
+						</view>
+						<text class="rate-name">{{ item.name }}</text>
+						<text class="rate-hint">{{ item.hint }}</text>
+					</view>
+					<view class="rate-input-box">
+						<input
+							class="rate-input"
+							type="digit"
+							:value="item.text"
+							placeholder="0"
+							placeholder-class="rate-placeholder"
+							@input="onRateInput(index, $event)"
+						/>
+						<text class="rate-unit">{{ t('rates.unit') }}</text>
+					</view>
+				</view>
+			</view>
+
+			<view class="btn btn-mint save-btn" @click="saveRates">
+				<image class="save-icon" src="/static/icons/ui-check.png" />
+				<text class="btn-mint-text save-text">{{ t('rates.save') }}</text>
+			</view>
+
+			<view class="live-row" @click="refreshRates">
+				<view :class="quoteLoading ? 'live-icon-wrap spinning' : 'live-icon-wrap'">
+					<image class="live-icon" src="/static/icons/ui-swap-light.png" />
+				</view>
+				<view class="grow live-main">
+					<text class="live-title">{{ quoteLoading ? t('rates.fetching') : t('rates.liveRefresh') }}</text>
+					<text class="live-sub">{{ ratesUpdatedText }}</text>
+				</view>
+				<image class="live-chevron" src="/static/icons/ui-right-light.png" />
+			</view>
+
+			<view class="reset-row reset-row-secondary" @click="askReset">
+				<text class="reset-text reset-text-secondary">{{ t('rates.resetDefault') }}</text>
+			</view>
+
+			<view class="rate-foot">
+				<view class="dot dot-mint"></view>
+				<text class="rate-foot-text">{{ t('rates.sourceNote') }}</text>
+			</view>
+
+			<view class="bottom-space"></view>
+		</view>
+
+		<view v-if="quoteOpen" class="modal-mask modal-mask-center">
+			<view class="dialog quote-dialog">
+				<text class="dialog-title">{{ t('rates.quoteTitle') }}</text>
+				<text class="dialog-msg">{{ t('rates.quoteMsg') }}</text>
+				<view class="quote-list">
+					<view v-for="item in quoteRows" :key="item.code" class="quote-row">
+						<text class="quote-code">{{ item.code }}</text>
+						<text class="quote-value">{{ item.value }}</text>
+						<text :class="item.deltaClass">{{ item.delta }}</text>
+					</view>
+				</view>
+				<text class="quote-source">{{ quoteSourceText }}</text>
+				<view class="row dialog-actions">
+					<view class="dialog-btn dialog-btn-ghost" @click="closeQuote">
+						<text class="dialog-btn-ghost-text">{{ t('rates.later') }}</text>
+					</view>
+					<view class="dialog-btn dialog-btn-mint" @click="applyQuote">
+						<text class="dialog-btn-mint-text">{{ t('rates.apply') }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+
+		<view v-if="resetOpen" class="modal-mask modal-mask-center">
+			<view class="dialog">
+				<text class="dialog-title">{{ t('rates.resetTitle') }}</text>
+				<text class="dialog-msg">{{ t('rates.resetMsg') }}</text>
+				<view class="row dialog-actions">
+					<view class="dialog-btn dialog-btn-ghost" @click="closeReset">
+						<text class="dialog-btn-ghost-text">{{ t('common.cancel') }}</text>
+					</view>
+					<view class="dialog-btn dialog-btn-dark" @click="confirmReset">
+						<text class="dialog-btn-dark-text">{{ t('rates.reset') }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, ref } from 'vue'
+	import AuroraBg from '@/components/aurora-bg.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs, setRates } from '@/stores/prefs.uts'
+	import { session } from '@/stores/session.uts'
+	import { ensureLoaded, syncSettings } from '@/stores/ledger.uts'
+	import { CURRENCIES, copyDefaultRates, currencyName } from '@/constants/currencies.uts'
+	import { parseAmount, rateOf, trimAmountInput } from '@/utils/money.uts'
+	import { groupDateKey } from '@/utils/date.uts'
+	import { cloudLatestRates } from '@/services/cloud.uts'
+	import { Rate, RatesSnapshot } from '@/types/models.uts'
+
+	const META_KEY = 'mint_rates_meta'
+	const CHECK_KEY = 'mint_rates_check_day'
+
+	type RateRow = {
+		code : string
+		name : string
+		symbol : string
+		text : string
+		hint : string
+	}
+
+	type QuoteRow = {
+		code : string
+		value : string
+		delta : string
+		deltaClass : string
+	}
+
+	type RatesMeta = {
+		source : string
+		date : string
+	}
+
+	function formatRate(value : number) : string {
+		const fixed = value.toFixed(4)
+		let end = fixed.length
+		while (end > 0 && fixed.charAt(end - 1) == '0') {
+			end--
+		}
+		if (end > 0 && fixed.charAt(end - 1) == '.') {
+			end--
+		}
+		return fixed.substring(0, end)
+	}
+
+	function hintFor(code : string, text : string) : string {
+		const value = parseAmount(text)
+		if (value <= 0) return t('rates.invalid')
+		return '1 ' + code + ' ≈ ' + formatRate(value) + ' ' + t('rates.unit')
+	}
+
+	function buildRows() : Array<RateRow> {
+		const result : Array<RateRow> = []
+		for (let i = 0; i < CURRENCIES.length; i++) {
+			const item = CURRENCIES[i]
+			if (item.code == 'CNY') continue
+			const text = formatRate(rateOf(item.code, prefs.rates))
+			result.push({
+				code: item.code,
+				name: currencyName(item.code, prefs.locale),
+				symbol: item.symbol,
+				text: text,
+				hint: hintFor(item.code, text)
+			})
+		}
+		return result
+	}
+
+	const rows = ref<Array<RateRow>>(buildRows())
+	const resetOpen = ref(false)
+	const quoteOpen = ref(false)
+	const quoteLoading = ref(false)
+	const quoteRows = ref<Array<QuoteRow>>([])
+	const quoteRates = ref<Array<Rate>>([])
+	const quoteSource = ref('')
+	const quoteDate = ref('')
+	const updatedMeta = ref<RatesMeta>({ source: '', date: '' })
+
+	function loadMeta() : void {
+		const raw = uni.getStorageSync(META_KEY)
+		if (typeof raw == 'string') {
+			const value = raw as string
+			if (value.length > 0) {
+				const parsed = JSON.parse<RatesMeta>(value)
+				if (parsed != null) {
+					updatedMeta.value = parsed
+				}
+			}
+		}
+	}
+
+	function clearMeta() : void {
+		updatedMeta.value = { source: '', date: '' }
+		uni.removeStorageSync(META_KEY)
+	}
+
+	loadMeta()
+
+	onPageShow(() => {
+		if (!session.isLoggedIn) {
+			uni.reLaunch({
+				url: '/pages/login/login'
+			})
+			return
+		}
+		ensureLoaded()
+		maybeAutoRefresh()
+	})
+
+	const cnyQuote = computed(() : string => {
+		return '1 CNY = 1 ' + t('rates.unit')
+	})
+
+	const ratesUpdatedText = computed(() : string => {
+		const meta = updatedMeta.value
+		if (meta.source.length == 0) return t('rates.updatedLocal')
+		if (meta.date.length == 0) return meta.source
+		return meta.source + ' · ' + meta.date
+	})
+
+	const quoteSourceText = computed(() : string => {
+		if (quoteSource.value.length == 0) return ''
+		if (quoteDate.value.length == 0) return quoteSource.value
+		return quoteSource.value + ' · ' + quoteDate.value
+	})
+
+	function buildQuoteRows(input : Array<Rate>) : Array<QuoteRow> {
+		const result : Array<QuoteRow> = []
+		for (let i = 0; i < input.length; i++) {
+			const item = input[i]
+			if (item.currency == 'CNY') continue
+			const previous = rateOf(item.currency, prefs.rates)
+			let percent = 0
+			if (previous > 0) {
+				percent = ((item.rateCny - previous) / previous) * 100
+			}
+			let deltaClass = 'quote-delta quote-flat'
+			if (percent > 0.005) deltaClass = 'quote-delta quote-up'
+			if (percent < -0.005) deltaClass = 'quote-delta quote-down'
+			const sign = percent > 0.005 ? '+' : ''
+			result.push({
+				code: item.currency,
+				value: formatRate(item.rateCny),
+				delta: sign + percent.toFixed(2) + '%',
+				deltaClass: deltaClass
+			})
+		}
+		return result
+	}
+
+	function openQuote(snapshot : RatesSnapshot) : void {
+		quoteRates.value = snapshot.rates
+		quoteSource.value = snapshot.source
+		quoteDate.value = snapshot.date
+		quoteRows.value = buildQuoteRows(snapshot.rates)
+		quoteOpen.value = true
+	}
+
+	async function fetchRates(manual : boolean) : Promise<void> {
+		if (quoteLoading.value) return
+		if (session.token == 'demo-token') {
+			if (manual) {
+				uni.showToast({
+					title: t('rates.demoUnavailable'),
+					icon: 'none'
+				})
+			}
+			return
+		}
+		quoteLoading.value = true
+		if (manual) {
+			uni.showLoading({
+				title: t('rates.fetching'),
+				mask: true
+			})
+		}
+		let ok = false
+		let snapshot : RatesSnapshot = { source: '', date: '', fetchedAt: 0, rates: [] }
+		try {
+			snapshot = await cloudLatestRates()
+			uni.setStorageSync(CHECK_KEY, groupDateKey(Date.now()))
+			ok = true
+		} catch (e) {
+			ok = false
+		}
+		if (manual) {
+			uni.hideLoading()
+		}
+		quoteLoading.value = false
+		if (ok) {
+			openQuote(snapshot)
+		} else if (manual) {
+			uni.showToast({
+				title: t('rates.fetchFailed'),
+				icon: 'none'
+			})
+		}
+	}
+
+	function refreshRates() : void {
+		fetchRates(true)
+	}
+
+	function maybeAutoRefresh() : void {
+		const raw = uni.getStorageSync(CHECK_KEY)
+		if (typeof raw == 'string') {
+			const value = raw as string
+			if (value == groupDateKey(Date.now())) return
+		}
+		fetchRates(false)
+	}
+
+	function closeQuote() : void {
+		quoteOpen.value = false
+	}
+
+	async function applyQuote() : Promise<void> {
+		if (quoteRates.value.length == 0) return
+		quoteOpen.value = false
+		setRates(quoteRates.value)
+		rows.value = buildRows()
+		updatedMeta.value = { source: quoteSource.value, date: quoteDate.value }
+		uni.setStorageSync(META_KEY, JSON.stringify(updatedMeta.value))
+		uni.setStorageSync(CHECK_KEY, groupDateKey(Date.now()))
+		await syncSettings()
+		uni.showToast({
+			title: t('rates.applied'),
+			icon: 'success'
+		})
+	}
+
+	function goBack() : void {
+		uni.navigateBack()
+	}
+
+	function onRateInput(index : number, event : UniInputEvent) : void {
+		const text = trimAmountInput(event.detail.value)
+		rows.value[index].text = text
+		rows.value[index].hint = hintFor(rows.value[index].code, text)
+	}
+
+	async function saveRates() : Promise<void> {
+		const next : Array<Rate> = []
+		next.push({ currency: 'CNY', rateCny: 1 })
+		for (let i = 0; i < rows.value.length; i++) {
+			const row = rows.value[i]
+			const value = parseAmount(row.text)
+			if (value <= 0) {
+				uni.showToast({
+					title: t('rates.invalid'),
+					icon: 'none'
+				})
+				return
+			}
+			next.push({ currency: row.code, rateCny: value })
+		}
+		setRates(next)
+		clearMeta()
+		await syncSettings()
+		uni.showToast({
+			title: t('rates.saved'),
+			icon: 'success'
+		})
+	}
+
+	function askReset() : void {
+		resetOpen.value = true
+	}
+
+	function closeReset() : void {
+		resetOpen.value = false
+	}
+
+	function confirmReset() : void {
+		resetOpen.value = false
+		setRates(copyDefaultRates())
+		clearMeta()
+		rows.value = buildRows()
+		syncSettings()
+		uni.showToast({
+			title: t('rates.resetDone'),
+			icon: 'none'
+		})
+	}
+</script>
+
+<style>
+	.topbar {
+		padding-top: 2px;
+		padding-bottom: 2px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.back-btn {
+		width: 38px;
+		height: 38px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+		margin-right: 12px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.12);
+	}
+
+	.head-left {
+		flex-direction: column;
+	}
+
+	.page-title {
+		font-size: 27px;
+		font-weight: 800;
+		letter-spacing: -0.8px;
+		color: #F2F6F1;
+	}
+
+	.page-sub {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		margin-top: 5px;
+	}
+
+	.base-pill {
+		height: 28px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.06);
+		padding-left: 11px;
+		padding-right: 11px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+	}
+
+	.base-pill-text {
+		font-size: 10px;
+		font-weight: 700;
+		color: rgba(234,242,237,0.55);
+	}
+
+	.rate-hero {
+		margin-top: 18px;
+		background-color: rgba(17,24,20,0.64);
+		background-image: radial-gradient(125% 115% at 94% -12%, rgba(123,231,191,0.26) 0%, rgba(123,231,191,0.07) 42%, rgba(255,255,255,0.02) 68%, rgba(255,255,255,0.055) 100%);
+		border-radius: 28px;
+		padding: 20px;
+		overflow: hidden;
+		position: relative;
+		flex-direction: column;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.18), inset 0 1px 0 rgba(255,255,255,0.24), 0 22px 48px rgba(0,0,0,0.50);
+	}
+
+	.hero-orbit {
+		position: absolute;
+		width: 180px;
+		height: 180px;
+		border-radius: 90px;
+		border-width: 1px;
+		border-style: solid;
+		border-color: rgba(244, 240, 232, 0.09);
+		right: -66px;
+		top: -76px;
+	}
+
+	.hero-tile {
+		width: 44px;
+		height: 44px;
+		border-radius: 14px;
+		background-color: rgba(123,231,191,0.14);
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.20), inset 0 1px 0 rgba(255,255,255,0.16);
+	}
+
+	.hero-tile-text {
+		font-size: 20px;
+		font-weight: 700;
+		color: #A9EDCB;
+	}
+
+	.hero-main {
+		margin-left: 12px;
+		flex-direction: column;
+	}
+
+	.hero-label {
+		font-size: 14px;
+		font-weight: 700;
+		color: #F4F1E9;
+	}
+
+	.hero-sub {
+		font-size: 10px;
+		color: rgba(244, 240, 232, 0.5);
+		margin-top: 4px;
+	}
+
+	.hero-value-wrap {
+		align-items: flex-end;
+		flex-direction: column;
+	}
+
+	.hero-value {
+		font-size: 24px;
+		font-weight: 800;
+		color: #F4F1E9;
+		letter-spacing: -0.6px;
+	}
+
+	.hero-value-unit {
+		font-size: 9px;
+		color: rgba(244, 240, 232, 0.45);
+		margin-top: 2px;
+	}
+
+	.hero-divider {
+		height: 1px;
+		background-color: rgba(244, 240, 232, 0.1);
+		margin-top: 15px;
+		margin-bottom: 12px;
+	}
+
+	.hero-quote {
+		font-size: 12px;
+		font-weight: 650;
+		color: #A9EDCB;
+	}
+
+	.hero-quote-label {
+		font-size: 9px;
+		color: rgba(244, 240, 232, 0.4);
+	}
+
+	.hero-hint {
+		font-size: 9px;
+		color: rgba(244, 240, 232, 0.4);
+		line-height: 15px;
+		margin-top: 10px;
+	}
+
+	.section-header {
+		margin-top: 20px;
+		margin-bottom: 9px;
+		padding-left: 4px;
+		padding-right: 4px;
+		flex-direction: row;
+		align-items: flex-end;
+		justify-content: space-between;
+	}
+
+	.section-title {
+		font-size: 15px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.section-sub {
+		font-size: 10px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+	}
+
+	.caption-tag {
+		height: 22px;
+		border-radius: 8px;
+		background-color: rgba(123,231,191,0.12);
+		padding-left: 8px;
+		padding-right: 8px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.caption-tag-text {
+		font-size: 9px;
+		font-weight: 700;
+		color: #8FE3BC;
+	}
+
+	.rates-card {
+		padding: 4px 16px;
+	}
+
+	.rate-row {
+		flex-direction: row;
+		align-items: center;
+		padding-top: 13px;
+		padding-bottom: 13px;
+	}
+
+	.rate-tile {
+		width: 38px;
+		height: 38px;
+		border-radius: 12px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.rate-symbol {
+		font-size: 14px;
+		font-weight: 750;
+		color: rgba(234,242,237,0.70);
+	}
+
+	.rate-main {
+		margin-left: 11px;
+		margin-right: 8px;
+		flex-direction: column;
+	}
+
+	.rate-code {
+		font-size: 12px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.base-tag {
+		height: 17px;
+		border-radius: 6px;
+		background-color: rgba(123,231,191,0.12);
+		padding-left: 5px;
+		padding-right: 5px;
+		align-items: center;
+		justify-content: center;
+		margin-left: 6px;
+	}
+
+	.base-tag-text {
+		font-size: 8px;
+		font-weight: 650;
+		color: #8FE3BC;
+	}
+
+	.rate-name {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 2px;
+	}
+
+	.rate-hint {
+		font-size: 9px;
+		color: rgba(234,242,237,0.30);
+		margin-top: 3px;
+	}
+
+	.rate-input-box {
+		width: 108px;
+		height: 40px;
+		border-radius: 12px;
+		background-color: rgba(255,255,255,0.06);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 10px;
+		padding-right: 9px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.12);
+	}
+
+	.rate-input {
+		flex: 1;
+		height: 40px;
+		font-size: 14px;
+		font-weight: 700;
+		color: #F2F6F1;
+		text-align: right;
+	}
+
+	.rate-placeholder {
+		color: rgba(234,242,237,0.26);
+	}
+
+	.rate-unit {
+		font-size: 8px;
+		font-weight: 650;
+		color: rgba(234,242,237,0.42);
+		margin-left: 4px;
+	}
+
+	.save-btn {
+		margin-top: 18px;
+		flex-direction: row;
+	}
+
+	.save-icon {
+		width: 15px;
+		height: 15px;
+		margin-right: 7px;
+		opacity: 0.8;
+	}
+
+	.save-text {
+		font-size: 14px;
+	}
+
+	.live-row {
+		height: 60px;
+		margin-top: 12px;
+		border-radius: 16px;
+		background-color: rgba(123,231,191,0.07);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 13px;
+		padding-right: 14px;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.14), inset 0 1px 0 rgba(255,255,255,0.10);
+	}
+
+	.live-icon-wrap {
+		width: 34px;
+		height: 34px;
+		border-radius: 12px;
+		background-color: rgba(123,231,191,0.14);
+		align-items: center;
+		justify-content: center;
+		margin-right: 11px;
+	}
+
+	.live-icon {
+		width: 16px;
+		height: 16px;
+	}
+
+	.live-main {
+		flex-direction: column;
+	}
+
+	.live-title {
+		font-size: 12px;
+		font-weight: 700;
+		color: #A9EDCB;
+	}
+
+	.live-sub {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+	}
+
+	.live-chevron {
+		width: 12px;
+		height: 12px;
+		opacity: 0.32;
+	}
+
+	.spinning {
+		opacity: 0.5;
+	}
+
+	.reset-row-secondary {
+		height: 40px;
+		margin-top: 4px;
+		background-color: transparent;
+		box-shadow: none;
+	}
+
+	.reset-text-secondary {
+		font-size: 10px;
+		font-weight: 500;
+		color: rgba(234,242,237,0.34);
+		margin-left: 0;
+	}
+
+	.quote-list {
+		margin-top: 12px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.04);
+		padding: 6px 12px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+	}
+
+	.quote-row {
+		height: 29px;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.quote-code {
+		width: 46px;
+		font-size: 11px;
+		font-weight: 700;
+		color: rgba(234,242,237,0.68);
+	}
+
+	.quote-value {
+		flex: 1;
+		font-size: 12px;
+		font-weight: 650;
+		color: #F2F6F1;
+		text-align: right;
+	}
+
+	.quote-delta {
+		width: 62px;
+		font-size: 10px;
+		font-weight: 650;
+		text-align: right;
+	}
+
+	.quote-flat {
+		color: rgba(234,242,237,0.36);
+	}
+
+	.quote-up {
+		color: #FFB39A;
+	}
+
+	.quote-down {
+		color: #A9EDCB;
+	}
+
+	.quote-source {
+		margin-top: 10px;
+		font-size: 9px;
+		color: rgba(234,242,237,0.40);
+		text-align: center;
+	}
+
+	.quote-dialog {
+		padding-bottom: 16px;
+	}
+
+	.reset-row {
+		height: 46px;
+		margin-top: 10px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.055);
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+	}
+
+	.reset-icon {
+		width: 14px;
+		height: 14px;
+		opacity: 0.4;
+	}
+
+	.reset-text {
+		font-size: 11px;
+		font-weight: 600;
+		color: rgba(234,242,237,0.55);
+		margin-left: 6px;
+	}
+
+	.rate-foot {
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		margin-top: 14px;
+	}
+
+	.rate-foot-text {
+		font-size: 9px;
+		color: rgba(234,242,237,0.32);
+		margin-left: 6px;
+	}
+
+	.bottom-space {
+		height: 32px;
+	}
+
+	.dialog-title {
+		font-size: 17px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.dialog-msg {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		line-height: 19px;
+		margin-top: 8px;
+	}
+
+	.dialog-actions {
+		margin-top: 20px;
+	}
+
+	.dialog-btn {
+		flex: 1;
+		height: 46px;
+		border-radius: 14px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dialog-btn-ghost {
+		background-color: rgba(255,255,255,0.06);
+	}
+
+	.dialog-btn-ghost-text {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.dialog-btn-dark {
+		background-color: rgba(255,255,255,0.075);
+		margin-left: 10px;
+	}
+
+	.dialog-btn-dark-text {
+		font-size: 13px;
+		font-weight: 700;
+		color: #F4F1E9;
+	}
+</style>

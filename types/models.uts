@@ -1,0 +1,186 @@
+/** 汇率：1 单位该币种 = rateCny 元人民币 */
+export type Rate = {
+	currency : string
+	rateCny : number
+}
+
+export type RatesSnapshot = {
+	source : string
+	date : string
+	fetchedAt : number
+	rates : Array<Rate>
+}
+
+export type CurrencyDef = {
+	code : string
+	symbol : string
+	nameZh : string
+	nameEn : string
+	decimals : number
+	fallbackRate : number
+}
+
+export type CategoryDef = {
+	id : string
+	nameZh : string
+	nameEn : string
+	icon : string
+	color : string
+	type : string
+}
+
+export type User = {
+	id : string
+	nickname : string
+	avatar : string
+}
+
+export type LoginResult = {
+	token : string
+	user : User
+	isNewUser : boolean
+}
+
+export type Transaction = {
+	id : string
+	type : string
+	amount : number
+	currency : string
+	categoryId : string
+	note : string
+	date : number
+	sourceDebtId : string
+	createdAt : number
+	updatedAt : number
+}
+
+export type TransactionInput = {
+	id : string
+	type : string
+	amount : number
+	currency : string
+	categoryId : string
+	note : string
+	date : number
+}
+
+export type Debt = {
+	id : string
+	direction : string
+	counterparty : string
+	amount : number
+	currency : string
+	dueDate : number
+	note : string
+	settled : boolean
+	settledAt : number
+	linkedTxId : string
+	createdAt : number
+	updatedAt : number
+}
+
+export type DebtInput = {
+	id : string
+	direction : string
+	counterparty : string
+	amount : number
+	currency : string
+	dueDate : number
+	note : string
+}
+
+export type Budget = {
+	id : string
+	categoryId : string
+	amount : number
+	currency : string
+	alertAt : number
+	createdAt : number
+	updatedAt : number
+}
+
+export type BudgetInput = {
+	id : string
+	categoryId : string
+	amount : number
+	currency : string
+	alertAt : number
+}
+
+export type Settings = {
+	locale : string
+	baseCurrency : string
+	rates : Array<Rate>
+	notifyWechat : boolean
+}
+
+export type Snapshot = {
+	transactions : Array<Transaction>
+	debts : Array<Debt>
+	budgets : Array<Budget>
+	settings : Settings
+}
+
+export type BudgetAlert = {
+	budgetId : string
+	categoryId : string
+	percent : number
+	spent : number
+	limit : number
+	currency : string
+}
+
+export type SettleResult = {
+	debt : Debt
+	transaction : Transaction
+}
+
+export type CategoryStat = {
+	categoryId : string
+	amount : number
+	count : number
+}
+
+export type MonthStat = {
+	key : string
+	income : number
+	expense : number
+}
+
+export type MonthSummary = {
+	income : number
+	expense : number
+	balance : number
+}
+
+export type DebtSummary = {
+	receivable : number
+	payable : number
+	net : number
+}
+
+export type DayGroup = {
+	key : string
+	label : string
+	income : number
+	expense : number
+	items : Array<Transaction>
+}
+
+export type ChartSegment = {
+	label : string
+	value : number
+	color : string
+}
+
+export type BarItem = {
+	label : string
+	value : number
+	highlight : boolean
+}
+
+export type InsightItem = {
+	label : string
+	value : string
+	icon : string
+}

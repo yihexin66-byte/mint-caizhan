@@ -1,0 +1,786 @@
+<template>
+	<view class="page">
+		<aurora-bg level="mid" />
+		<view class="status-spacer"></view>
+		<view class="page-content">
+			<view class="topbar enter-fade">
+				<view class="icon-btn" @click="goBack">
+					<image class="icon-18" src="/static/icons/ui-back-light.png" />
+				</view>
+				<view class="head-left">
+					<text class="page-title">{{ t('debts.title') }}</text>
+					<text class="page-sub">{{ t('debts.subtitle') }}</text>
+				</view>
+				<view class="quick-add" @click="addDebt">
+					<image class="quick-add-icon" src="/static/icons/ui-plus-ink.png" />
+					<text class="quick-add-text">{{ t('debts.add') }}</text>
+				</view>
+			</view>
+
+			<view v-if="!ledger.loaded" class="loading-wrap">
+				<image class="logo-40" src="/static/icons/logo-light.png" />
+				<text class="loading-text">{{ ledger.error.length > 0 ? t('common.networkError') : t('common.loading') }}</text>
+			</view>
+
+			<view v-else>
+				<view class="hero-card enter-pop enter-d2">
+					<view class="hero-orbit"></view>
+					<view class="row justify-between items-center">
+						<view class="row items-center">
+							<view class="hero-dot"></view>
+							<text class="hero-label">{{ t('debts.net') }}</text>
+						</view>
+						<view class="hero-count">
+							<text class="hero-count-text">{{ openCountText }}</text>
+						</view>
+					</view>
+					<text class="hero-amount">{{ netText }}</text>
+
+					<view class="row hero-stats">
+						<view class="hero-stat">
+							<view class="row items-center">
+								<view class="dot dot-mint"></view>
+								<text class="hero-stat-label">{{ t('debts.receivable') }}</text>
+							</view>
+							<text class="hero-stat-value">{{ receivableText }}</text>
+							<text class="hero-stat-sub">{{ receivableCountText }}</text>
+						</view>
+						<view class="hero-stat hero-stat-right">
+							<view class="row items-center">
+								<view class="dot dot-orange"></view>
+								<text class="hero-stat-label">{{ t('debts.payable') }}</text>
+							</view>
+							<text class="hero-stat-value">{{ payableText }}</text>
+							<text class="hero-stat-sub">{{ payableCountText }}</text>
+						</view>
+					</view>
+				</view>
+
+				<view class="filter-row enter-rise enter-d3">
+					<view :class="filter == 'active' ? 'chip chip-active filter-chip' : 'chip filter-chip'" @click="setFilter('active')">
+						<text :class="filter == 'active' ? 'chip-text chip-text-active' : 'chip-text'">{{ t('debts.active') }}</text>
+					</view>
+					<view :class="filter == 'settled' ? 'chip chip-active filter-chip' : 'chip filter-chip'" @click="setFilter('settled')">
+						<text :class="filter == 'settled' ? 'chip-text chip-text-active' : 'chip-text'">{{ t('debts.settled') }}</text>
+					</view>
+				</view>
+
+				<view v-if="filter == 'active'" class="enter-rise enter-d4">
+					<view v-if="activeViews.length == 0" class="mt-14">
+						<empty-state
+							:title="t('debts.empty')"
+							:subtitle="t('debts.emptySub')"
+							:action="t('debts.add')"
+							icon="/static/icons/logo-light.png"
+							@action="addDebt"
+						/>
+					</view>
+					<view v-else>
+						<view v-for="item in activeViews" :key="item.id" class="card debt-item" @click="openEdit(item.id)">
+							<view class="row justify-between items-center">
+								<view :class="item.direction == 'receivable' ? 'dir-chip dir-chip-in' : 'dir-chip dir-chip-out'">
+									<text :class="item.direction == 'receivable' ? 'dir-chip-text dir-chip-text-in' : 'dir-chip-text dir-chip-text-out'">{{ item.dirLabel }}</text>
+								</view>
+								<text :class="item.overdue ? 'due-text due-text-over' : 'due-text'">{{ item.dueText }}</text>
+							</view>
+
+							<view class="row items-end debt-main">
+								<view class="grow">
+									<text class="debt-name">{{ item.counterparty }}</text>
+									<text v-if="item.note.length > 0" class="debt-note">{{ item.note }}</text>
+								</view>
+								<text class="debt-amount">{{ item.amountText }}</text>
+							</view>
+
+							<view class="debt-line"></view>
+							<view class="row justify-between items-center">
+								<view class="row items-center">
+									<image class="debt-mini-icon" src="/static/icons/ui-edit-light.png" />
+									<text class="debt-edit-hint">{{ t('common.edit') }}</text>
+								</view>
+								<view class="settle-btn" @click.stop="askSettle(item.id)">
+									<image class="settle-icon" src="/static/icons/ui-check-light.png" />
+									<text class="settle-text">{{ t('debts.settle') }}</text>
+								</view>
+							</view>
+						</view>
+					</view>
+				</view>
+
+				<view v-else class="enter-rise enter-d4">
+					<view v-if="settledViews.length == 0" class="mt-14">
+						<empty-state
+							:title="t('debts.noSettled')"
+							:subtitle="t('debts.subtitle')"
+							icon="/static/icons/logo-light.png"
+						/>
+					</view>
+					<view v-else>
+						<view v-for="item in settledViews" :key="item.id" class="card settled-item">
+							<view class="row justify-between items-center">
+								<view class="row items-center">
+									<view class="settled-check">
+										<image class="settled-check-icon" src="/static/icons/ui-check-white.png" />
+									</view>
+									<view class="settled-main">
+										<text class="settled-name">{{ item.counterparty }}</text>
+										<text class="settled-sub">{{ item.settledText }}</text>
+									</view>
+								</view>
+								<text class="settled-amount">{{ item.amountText }}</text>
+							</view>
+							<view class="settled-foot">
+								<view class="row items-center">
+									<view class="dot dot-mint"></view>
+									<text class="settled-linked">{{ item.linkedText }}</text>
+								</view>
+								<text class="settled-tag">{{ item.dirLabel }}</text>
+							</view>
+						</view>
+					</view>
+				</view>
+
+				<view class="bottom-space"></view>
+			</view>
+		</view>
+
+		<view v-if="settleTargetId.length > 0" class="modal-mask modal-mask-center">
+			<view class="dialog">
+				<view class="dialog-icon">
+					<image class="icon-20" src="/static/icons/ui-swap-light.png" />
+				</view>
+				<text class="dialog-title">{{ t('debts.settleTitle') }}</text>
+				<text class="dialog-msg">{{ settleMessage }}</text>
+				<view class="settle-summary">
+					<text class="settle-summary-name">{{ settleName }}</text>
+					<text class="settle-summary-amount">{{ settleAmountText }}</text>
+				</view>
+				<view class="row dialog-actions">
+					<view class="dialog-btn dialog-btn-ghost" @click="closeSettle">
+						<text class="dialog-btn-ghost-text">{{ t('common.cancel') }}</text>
+					</view>
+					<view class="dialog-btn dialog-btn-mint" @click="confirmSettle">
+						<text class="dialog-btn-mint-text">{{ t('debts.settle') }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, ref } from 'vue'
+	import AuroraBg from '@/components/aurora-bg.uvue'
+	import EmptyState from '@/components/empty-state.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs } from '@/stores/prefs.uts'
+	import { session } from '@/stores/session.uts'
+	import { ledger, ensureLoaded, findDebt, settleDebtItem } from '@/stores/ledger.uts'
+	import { debtSummary, openDebtCount } from '@/utils/stats.uts'
+	import { dateLabel, dueLabel, isOverdue } from '@/utils/date.uts'
+	import { formatCurrency } from '@/utils/money.uts'
+	import { Debt } from '@/types/models.uts'
+
+	type DebtView = {
+		id : string
+		direction : string
+		counterparty : string
+		note : string
+		amountText : string
+		dirLabel : string
+		dueText : string
+		overdue : boolean
+		settledText : string
+		linkedText : string
+	}
+
+	onPageShow(() => {
+		if (!session.isLoggedIn) {
+			uni.reLaunch({
+				url: '/pages/login/login'
+			})
+			return
+		}
+		ensureLoaded()
+	})
+
+	const filter = ref('active')
+	const settleTargetId = ref('')
+
+	const summary = computed(() => {
+		return debtSummary(ledger.debts)
+	})
+
+	const netText = computed(() : string => {
+		return formatCurrency(summary.value.net, prefs.baseCurrency, prefs.locale)
+	})
+
+	const receivableText = computed(() : string => {
+		return formatCurrency(summary.value.receivable, prefs.baseCurrency, prefs.locale)
+	})
+
+	const payableText = computed(() : string => {
+		return formatCurrency(summary.value.payable, prefs.baseCurrency, prefs.locale)
+	})
+
+	function countLabel(count : number) : string {
+		const unit = t('debts.countUnit')
+		return unit.length > 0 ? count.toString() + ' ' + unit : count.toString()
+	}
+
+	const receivableCountText = computed(() : string => {
+		return countLabel(openDebtCount(ledger.debts, 'receivable'))
+	})
+
+	const payableCountText = computed(() : string => {
+		return countLabel(openDebtCount(ledger.debts, 'payable'))
+	})
+
+	const openCountText = computed(() : string => {
+		const count = openDebtCount(ledger.debts, 'receivable') + openDebtCount(ledger.debts, 'payable')
+		return count.toString() + ' ' + t('debts.active')
+	})
+
+	const activeViews = computed<Array<DebtView>>(() => {
+		const result : Array<DebtView> = []
+		for (let i = 0; i < ledger.debts.length; i++) {
+			const debt = ledger.debts[i]
+			if (debt.settled) continue
+			result.push(toView(debt))
+		}
+		return result
+	})
+
+	const settledViews = computed<Array<DebtView>>(() => {
+		const list : Array<DebtView> = []
+		for (let i = 0; i < ledger.debts.length; i++) {
+			if (!ledger.debts[i].settled) continue
+			list.push(toView(ledger.debts[i]))
+		}
+		return list
+	})
+
+	function toView(debt : Debt) : DebtView {
+		const dirLabel = debt.direction == 'receivable' ? t('debts.receivable') : t('debts.payable')
+		const settledText = debt.settled
+			? t('debts.settledOn') + ' ' + dateLabel(debt.settledAt, prefs.locale)
+			: ''
+		const linkedText = debt.direction == 'receivable' ? t('debts.generatedIncome') : t('debts.generatedExpense')
+		return {
+			id: debt.id,
+			direction: debt.direction,
+			counterparty: debt.counterparty,
+			note: debt.note,
+			amountText: formatCurrency(debt.amount, debt.currency, prefs.locale),
+			dirLabel: dirLabel,
+			dueText: debt.settled ? '' : dueLabel(debt.dueDate, prefs.locale),
+			overdue: !debt.settled && isOverdue(debt.dueDate),
+			settledText: settledText,
+			linkedText: linkedText
+		}
+	}
+
+	const settleTarget = computed<Debt | null>(() => {
+		if (settleTargetId.value.length == 0) return null
+		return findDebt(settleTargetId.value)
+	})
+
+	const settleName = computed(() : string => {
+		const debt = settleTarget.value
+		if (debt == null) return ''
+		return debt.counterparty
+	})
+
+	const settleAmountText = computed(() : string => {
+		const debt = settleTarget.value
+		if (debt == null) return ''
+		return formatCurrency(debt.amount, debt.currency, prefs.locale)
+	})
+
+	const settleMessage = computed(() : string => {
+		const debt = settleTarget.value
+		if (debt == null) return ''
+		return debt.direction == 'receivable' ? t('debts.settleMsgReceivable') : t('debts.settleMsgPayable')
+	})
+
+	function setFilter(value : string) : void {
+		filter.value = value
+	}
+
+	function addDebt() : void {
+		uni.navigateTo({
+			url: '/pages/debt-edit/debt-edit'
+		})
+	}
+
+	function openEdit(id : string) : void {
+		uni.navigateTo({
+			url: '/pages/debt-edit/debt-edit?id=' + id
+		})
+	}
+
+	function askSettle(id : string) : void {
+		settleTargetId.value = id
+	}
+
+	function closeSettle() : void {
+		settleTargetId.value = ''
+	}
+
+	async function confirmSettle() : Promise<void> {
+		const id = settleTargetId.value
+		if (id.length == 0) return
+		try {
+			await settleDebtItem(id)
+			settleTargetId.value = ''
+			uni.showToast({
+				title: t('debts.settleDone'),
+				icon: 'success'
+			})
+		} catch (e) {
+			settleTargetId.value = ''
+			uni.showModal({
+				content: t('common.saveFailed'),
+				showCancel: false
+			})
+		}
+	}
+
+	function goBack() : void {
+		uni.navigateBack({
+			delta: 1,
+			fail: () => {
+				uni.reLaunch({
+					url: '/pages/shell/shell'
+				})
+			}
+		})
+	}
+</script>
+
+<style>
+	.topbar {
+		padding-top: 2px;
+		padding-bottom: 2px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.head-left {
+		flex: 1;
+		flex-direction: column;
+		margin-left: 12px;
+	}
+
+	.page-title {
+		font-size: 23px;
+		font-weight: 800;
+		letter-spacing: -0.6px;
+		color: #F2F6F1;
+	}
+
+	.page-sub {
+		font-size: 11px;
+		color: rgba(234,242,237,0.56);
+		margin-top: 4px;
+	}
+
+	.quick-add {
+		height: 38px;
+		border-radius: 14px;
+		background-color: #A9EDCB;
+		background-image: linear-gradient(160deg, #D6F8E6 0%, #A9EDCB 52%, #8FE3BC 100%);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 13px;
+		padding-right: 13px;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 18px rgba(143,227,188,0.28);
+	}
+
+	.quick-add-icon {
+		width: 15px;
+		height: 15px;
+	}
+
+	.quick-add-text {
+		font-size: 12px;
+		font-weight: 700;
+		color: #0B2117;
+		margin-left: 5px;
+	}
+
+	.hero-card {
+		margin-top: 16px;
+		background-color: rgba(17,24,20,0.64);
+		background-image: radial-gradient(125% 115% at 94% -12%, rgba(123,231,191,0.26) 0%, rgba(123,231,191,0.07) 42%, rgba(255,255,255,0.02) 68%, rgba(255,255,255,0.055) 100%);
+		border-radius: 28px;
+		padding: 20px;
+		overflow: hidden;
+		position: relative;
+		flex-direction: column;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.18), inset 0 1px 0 rgba(255,255,255,0.24), 0 22px 48px rgba(0,0,0,0.50);
+	}
+
+	.hero-orbit {
+		position: absolute;
+		width: 180px;
+		height: 180px;
+		border-radius: 90px;
+		border-width: 1px;
+		border-style: solid;
+		border-color: rgba(244, 240, 232, 0.09);
+		right: -60px;
+		top: -84px;
+	}
+
+	.hero-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 3px;
+		background-color: #7BE7BF;
+		margin-right: 7px;
+	}
+
+	.hero-label {
+		font-size: 11px;
+		color: rgba(244, 240, 232, 0.6);
+	}
+
+	.hero-count {
+		height: 24px;
+		border-radius: 12px;
+		background-color: rgba(244, 240, 232, 0.1);
+		padding-left: 10px;
+		padding-right: 10px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.hero-count-text {
+		font-size: 9px;
+		color: rgba(244, 240, 232, 0.7);
+	}
+
+	.hero-amount {
+		font-size: 33px;
+		font-weight: 800;
+		color: #F4F1E9;
+		letter-spacing: -1.2px;
+		margin-top: 10px;
+	}
+
+	.hero-stats {
+		margin-top: 18px;
+	}
+
+	.hero-stat {
+		flex: 1;
+		flex-direction: column;
+	}
+
+	.hero-stat-right {
+		border-left-width: 1px;
+		border-left-style: solid;
+		border-left-color: rgba(244, 240, 232, 0.1);
+		padding-left: 18px;
+		margin-left: 18px;
+	}
+
+	.hero-stat-label {
+		font-size: 10px;
+		color: rgba(244, 240, 232, 0.5);
+		margin-left: 6px;
+	}
+
+	.hero-stat-value {
+		font-size: 15px;
+		font-weight: 700;
+		color: #F4F1E9;
+		margin-top: 6px;
+	}
+
+	.hero-stat-sub {
+		font-size: 9px;
+		color: rgba(244, 240, 232, 0.4);
+		margin-top: 3px;
+	}
+
+	.filter-row {
+		flex-direction: row;
+		margin-top: 16px;
+	}
+
+	.filter-chip {
+		margin-right: 8px;
+	}
+
+	.debt-item {
+		margin-top: 12px;
+		padding: 15px 16px 11px 16px;
+	}
+
+	.dir-chip {
+		height: 24px;
+		border-radius: 12px;
+		padding-left: 10px;
+		padding-right: 10px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dir-chip-in {
+		background-color: rgba(123,231,191,0.12);
+	}
+
+	.dir-chip-out {
+		background-color: rgba(240,160,106,0.12);
+	}
+
+	.dir-chip-text {
+		font-size: 9px;
+		font-weight: 700;
+	}
+
+	.dir-chip-text-in {
+		color: #8FE3BC;
+	}
+
+	.dir-chip-text-out {
+		color: #F0A878;
+	}
+
+	.due-text {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+	}
+
+	.due-text-over {
+		color: #F08A70;
+		font-weight: 650;
+	}
+
+	.debt-main {
+		margin-top: 11px;
+	}
+
+	.debt-name {
+		font-size: 17px;
+		font-weight: 750;
+		color: #F2F6F1;
+		letter-spacing: -0.3px;
+	}
+
+	.debt-note {
+		font-size: 10px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 3px;
+	}
+
+	.debt-amount {
+		font-size: 19px;
+		font-weight: 800;
+		color: #F2F6F1;
+		letter-spacing: -0.4px;
+		margin-left: 10px;
+	}
+
+	.debt-line {
+		height: 1px;
+		background-color: rgba(255,255,255,0.08);
+		margin-top: 11px;
+		margin-bottom: 8px;
+	}
+
+	.debt-mini-icon {
+		width: 11px;
+		height: 11px;
+		opacity: 0.4;
+	}
+
+	.debt-edit-hint {
+		font-size: 9px;
+		color: rgba(234,242,237,0.38);
+		margin-left: 4px;
+	}
+
+	.settle-btn {
+		height: 32px;
+		border-radius: 11px;
+		background-color: rgba(255,255,255,0.07);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 12px;
+		padding-right: 12px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), inset 0 1px 0 rgba(255,255,255,0.12);
+	}
+
+	.settle-icon {
+		width: 12px;
+		height: 12px;
+		opacity: 0.75;
+	}
+
+	.settle-text {
+		font-size: 10px;
+		font-weight: 700;
+		color: #F4F1E9;
+		margin-left: 4px;
+	}
+
+	.settled-item {
+		margin-top: 10px;
+		padding: 14px 16px 12px 16px;
+	}
+
+	.settled-check {
+		width: 34px;
+		height: 34px;
+		border-radius: 11px;
+		background-color: #6FE0B2;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.settled-check-icon {
+		width: 16px;
+		height: 16px;
+	}
+
+	.settled-main {
+		margin-left: 11px;
+		flex-direction: column;
+	}
+
+	.settled-name {
+		font-size: 14px;
+		font-weight: 700;
+		color: #F2F6F1;
+	}
+
+	.settled-sub {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+	}
+
+	.settled-amount {
+		font-size: 15px;
+		font-weight: 750;
+		color: rgba(234,242,237,0.64);
+	}
+
+	.settled-foot {
+		margin-top: 10px;
+		border-top-width: 1px;
+		border-top-style: solid;
+		border-top-color: rgba(255,255,255,0.09);
+		padding-top: 8px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.settled-linked {
+		font-size: 9px;
+		color: #8FE3BC;
+		margin-left: 5px;
+	}
+
+	.settled-tag {
+		font-size: 9px;
+		color: rgba(234,242,237,0.32);
+	}
+
+	.bottom-space {
+		height: calc(24px + var(--uni-safe-area-inset-bottom));
+	}
+
+	.dialog-icon {
+		width: 46px;
+		height: 46px;
+		border-radius: 15px;
+		background-color: rgba(123,231,191,0.12);
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 14px;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.18);
+	}
+
+	.dialog-title {
+		font-size: 17px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.dialog-msg {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		line-height: 19px;
+		margin-top: 8px;
+	}
+
+	.settle-summary {
+		background-color: rgba(255,255,255,0.06);
+		border-radius: 14px;
+		padding: 12px 14px;
+		margin-top: 12px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+	}
+
+	.settle-summary-name {
+		font-size: 12px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.settle-summary-amount {
+		font-size: 14px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.dialog-actions {
+		margin-top: 18px;
+	}
+
+	.dialog-btn {
+		flex: 1;
+		height: 46px;
+		border-radius: 14px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dialog-btn-ghost {
+		background-color: rgba(255,255,255,0.06);
+	}
+
+	.dialog-btn-ghost-text {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.dialog-btn-mint {
+		background-color: #A9EDCB;
+		background-image: linear-gradient(160deg, #D6F8E6 0%, #A9EDCB 52%, #8FE3BC 100%);
+		margin-left: 10px;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 18px rgba(143,227,188,0.24);
+	}
+
+	.dialog-btn-mint-text {
+		font-size: 13px;
+		font-weight: 750;
+		color: #0B2117;
+	}
+
+	.loading-text {
+		font-size: 12px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 14px;
+	}
+</style>

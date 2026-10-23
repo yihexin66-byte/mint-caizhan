@@ -1,0 +1,94 @@
+<template>
+	<view class="empty-state">
+		<view class="empty-icon-wrap">
+			<image class="empty-icon" :src="props.icon" />
+		</view>
+		<text class="empty-title">{{ props.title }}</text>
+		<text class="empty-sub">{{ props.subtitle }}</text>
+		<view v-if="props.action.length > 0" class="btn btn-ghost btn-small empty-action" @click="emitAction">
+			<text class="btn-ghost-text">{{ props.action }}</text>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	defineOptions({
+		styleIsolation: 'app'
+	})
+
+	const props = defineProps({
+		title: {
+			type: String,
+			default: ''
+		},
+		subtitle: {
+			type: String,
+			default: ''
+		},
+		action: {
+			type: String,
+			default: ''
+		},
+		icon: {
+			type: String,
+			default: '/static/icons/logo-light.png'
+		}
+	})
+
+	const emit = defineEmits<{
+		(e : 'action') : void
+	}>()
+
+	function emitAction() : void {
+		emit('action')
+	}
+</script>
+
+<style>
+	.empty-state {
+		background-color: rgba(255,255,255,0.045);
+		background-image: linear-gradient(150deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.028) 46%, rgba(255,255,255,0.055) 100%);
+		border-radius: 24px;
+		padding: 30px 24px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.18), 0 16px 36px rgba(0,0,0,0.40);
+		align-items: center;
+		flex-direction: column;
+	}
+
+	.empty-icon-wrap {
+		width: 64px;
+		height: 64px;
+		border-radius: 20px;
+		background-color: rgba(255,255,255,0.07);
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.18);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.empty-icon {
+		width: 52px;
+		height: 52px;
+		border-radius: 16px;
+	}
+
+	.empty-title {
+		font-size: 16px;
+		font-weight: 750;
+		color: #F2F6F1;
+		margin-top: 16px;
+		text-align: center;
+	}
+
+	.empty-sub {
+		font-size: 12px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 7px;
+		text-align: center;
+		line-height: 19px;
+		max-width: 260px;
+	}
+
+	.empty-action {
+		margin-top: 16px;
+	}
+</style>

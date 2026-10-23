@@ -1,0 +1,43 @@
+{
+  "bsonType": "object",
+  "required": ["openid"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "设置记录 ID"
+    },
+    "openid": {
+      "bsonType": "string",
+      "description": "所属用户 openid"
+    },
+    "locale": {
+      "bsonType": "string",
+      "description": "zh 或 en"
+    },
+    "baseCurrency": {
+      "bsonType": "string"
+    },
+    "rates": {
+      "bsonType": "array",
+      "description": "以人民币为基准的汇率表"
+    },
+    "notifyWechat": {
+      "bsonType": "bool"
+    },
+    "subscription": {
+      "bsonType": "object",
+      "description": "订阅消息授权状态"
+    },
+    "createdAt": {
+      "bsonType": "number"
+    },
+    "updatedAt": {
+      "bsonType": "number"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "bsonType": "object",
+  "required": ["openid", "monthKey", "templateId"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "发送记录 ID"
+    },
+    "openid": {
+      "bsonType": "string"
+    },
+    "budgetId": {
+      "bsonType": "string",
+      "description": "all 表示总预算"
+    },
+    "monthKey": {
+      "bsonType": "string",
+      "description": "yyyy-MM"
+    },
+    "templateId": {
+      "bsonType": "string"
+    },
+    "percent": {
+      "bsonType": "number"
+    },
+    "spent": {
+      "bsonType": "number"
+    },
+    "limit": {
+      "bsonType": "number"
+    },
+    "currency": {
+      "bsonType": "string"
+    },
+    "channel": {
+      "bsonType": "string",
+      "description": "wechat"
+    },
+    "result": {
+      "bsonType": "string",
+      "description": "发送结果"
+    },
+    "createdAt": {
+      "bsonType": "number"
+    }
+  }
+}

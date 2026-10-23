@@ -1,0 +1,53 @@
+{
+  "bsonType": "object",
+  "required": ["openid", "type", "amount", "currency", "categoryId", "date"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "收支记录 ID"
+    },
+    "openid": {
+      "bsonType": "string",
+      "description": "所属用户 openid"
+    },
+    "type": {
+      "bsonType": "string",
+      "description": "income 或 expense"
+    },
+    "amount": {
+      "bsonType": "number",
+      "description": "原始币种金额"
+    },
+    "currency": {
+      "bsonType": "string",
+      "description": "币种代码"
+    },
+    "categoryId": {
+      "bsonType": "string",
+      "description": "分类 ID"
+    },
+    "note": {
+      "bsonType": "string",
+      "description": "备注"
+    },
+    "date": {
+      "bsonType": "number",
+      "description": "记账日期时间戳"
+    },
+    "sourceDebtId": {
+      "bsonType": "string",
+      "description": "由往来结清生成时记录来源 ID，此类记录不可改删"
+    },
+    "createdAt": {
+      "bsonType": "number"
+    },
+    "updatedAt": {
+      "bsonType": "number"
+    }
+  }
+}

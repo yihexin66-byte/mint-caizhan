@@ -1,0 +1,53 @@
+<template>
+	<view class="shell">
+		<aurora-bg level="high" />
+		<view class="status-spacer"></view>
+		<view class="shell-body">
+			<tab-home v-if="ui.activeTab == 'home'" />
+			<tab-records v-else-if="ui.activeTab == 'records'" />
+			<tab-stats v-else-if="ui.activeTab == 'stats'" />
+			<tab-budgets v-else />
+		</view>
+		<app-tabbar :active="ui.activeTab" />
+	</view>
+</template>
+
+<script setup lang="uts">
+	import AuroraBg from '@/components/aurora-bg.uvue'
+	import AppTabbar from '@/components/app-tabbar.uvue'
+	import TabHome from '@/components/tab-home.uvue'
+	import TabRecords from '@/components/tab-records.uvue'
+	import TabStats from '@/components/tab-stats.uvue'
+	import TabBudgets from '@/components/tab-budgets.uvue'
+	import { session } from '@/stores/session.uts'
+	import { openTab, ui } from '@/stores/ui.uts'
+
+	onLoad((options : OnLoadOptions) => {
+		const tab = options.getString('tab')
+		if (tab != null && (tab == 'home' || tab == 'records' || tab == 'stats' || tab == 'budgets')) {
+			openTab(tab)
+		}
+	})
+
+	onShow(() => {
+		if (!session.isLoggedIn) {
+			uni.reLaunch({
+				url: '/pages/login/login'
+			})
+		}
+	})
+</script>
+
+<style>
+	.shell {
+		min-height: 100vh;
+		flex-direction: column;
+		position: relative;
+	}
+
+	.shell-body {
+		flex-direction: column;
+		position: relative;
+		z-index: 1;
+	}
+</style>

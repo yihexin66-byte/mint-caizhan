@@ -1,0 +1,21 @@
+import { nextTick, reactive } from 'vue'
+
+export type UiState = {
+	activeTab : string
+}
+
+export const ui = reactive({
+	activeTab: 'home'
+} as UiState)
+
+export function openTab(key : string) : void {
+	if (key != ui.activeTab) {
+		ui.activeTab = key
+	}
+	nextTick(() : void => {
+		uni.pageScrollTo({
+			scrollTop: 0,
+			duration: 0
+		})
+	})
+}

@@ -1,0 +1,98 @@
+import { Rate } from '@/types/models.uts'
+import { currencyByCode, defaultRateFor } from '@/constants/currencies.uts'
+
+export function roundTo(value : number, decimals : number) : number {
+	const factor = Math.pow(10, decimals)
+	return Math.round(value * factor) / factor
+}
+
+export function formatNumber(value : number, decimals : number) : string {
+	const rounded = roundTo(Math.abs(value), decimals)
+	const fixed = rounded.toFixed(decimals)
+	const pieces = fixed.split('.')
+	const intPart = pieces[0]
+	let grouped = ''
+	let count = 0
+	for (let i = intPart.length - 1; i >= 0; i--) {
+		grouped = intPart.charAt(i) + grouped
+		count++
+		if (count % 3 == 0 && i > 0) {
+			grouped = ',' + grouped
+		}
+	}
+	if (pieces.length > 1) {
+		return grouped + '.' + pieces[1]
+	}
+	return grouped
+}
+
+export function formatCurrency(amount : number, code : string, locale : string) : string {
+	const def = currencyByCode(code)
+	let decimals = def.decimals
+	if (decimals > 0 && Math.abs(amount - Math.round(amount)) < 0.005) {
+		decimals = 0
+	}
+	const sign = amount < 0 ? '-' : ''
+	const symbol = locale == 'en' ? def.symbol : def.symbol
+	return sign + symbol + formatNumber(amount, decimals)
+}
+
+export function formatSignedCurrency(amount : number, code : string, locale : string) : string {
+	const prefix = amount >= 0 ? '+' : '-'
+	const def = currencyByCode(code)
+	let decimals = def.decimals
+	if (decimals > 0 && Math.abs(amount - Math.round(amount)) < 0.005) {
+		decimals = 0
+	}
+	return prefix + def.symbol + formatNumber(Math.abs(amount), decimals)
+}
+
+export function parseAmount(text : string) : number {
+	const n = parseFloat(text)
+	if (isNaN(n)) return 0
+	return n
+}
+
+export function rateOf(code : string, rates : Array<Rate>) : number {
+	for (let i = 0; i < rates.length; i++) {
+		if (rates[i].currency == code && rates[i].rateCny > 0) {
+			return rates[i].rateCny
+		}
+	}
+	return defaultRateFor(code)
+}
+
+export function convertAmount(amount : number, from : string, to : string, rates : Array<Rate>) : number {
+	if (from == to) return amount
+	const fromRate = rateOf(from, rates)
+	const toRate = rateOf(to, rates)
+	if (fromRate <= 0 || toRate <= 0) return amount
+	return amount * fromRate / toRate
+}
+
+export function formatPercent(value : number) : string {
+	const rounded = Math.round(value)
+	if (Math.abs(value - rounded) < 0.1) {
+		return rounded.toString() + '%'
+	}
+	return value.toFixed(1) + '%'
+}
+
+export function signedTransactionAmount(amount : number, type : string) : number {
+	return type == 'income' ? amount : -amount
+}
+
+export function trimAmountInput(value : string) : string {
+	let result = ''
+	let dotSeen = false
+	for (let i = 0; i < value.length; i++) {
+		const ch = value.charAt(i)
+		if (ch == '.' && !dotSeen) {
+			dotSeen = true
+			result = result + ch
+		} else if (ch >= '0' && ch <= '9') {
+			result = result + ch
+		}
+	}
+	return result
+}

@@ -1,0 +1,515 @@
+<template>
+	<view class="page login-page">
+		<aurora-bg level="low" />
+		<view class="status-spacer"></view>
+		<view class="deco-ring"></view>
+		<view class="deco-dot"></view>
+
+		<view class="login-top enter-fade">
+			<view class="row items-center">
+				<image class="logo-28" src="/static/icons/logo-light.png" />
+				<text class="brand">Mint.</text>
+			</view>
+			<view class="lang-switch">
+				<view :class="prefs.locale == 'zh' ? 'lang-item lang-item-on' : 'lang-item'" @click="chooseLocale('zh')">
+					<text :class="prefs.locale == 'zh' ? 'lang-text lang-text-on' : 'lang-text'">中</text>
+				</view>
+				<view :class="prefs.locale == 'en' ? 'lang-item lang-item-on' : 'lang-item'" @click="chooseLocale('en')">
+					<text :class="prefs.locale == 'en' ? 'lang-text lang-text-on' : 'lang-text'">EN</text>
+				</view>
+			</view>
+		</view>
+
+		<view class="login-hero enter-rise enter-d1">
+			<text class="hero-wordmark">Mint.</text>
+			<text class="hero-tagline">{{ t('login.tagline') }}</text>
+			<text class="hero-sub">{{ t('login.subtitle') }}</text>
+		</view>
+
+		<view class="preview-card enter-pop enter-d2">
+			<view class="row justify-between items-center">
+				<text class="preview-kicker">MINT · PREVIEW</text>
+				<view class="preview-badge">
+					<image class="preview-badge-icon" src="/static/icons/ui-sparkles-light.png" />
+					<text class="preview-badge-text">{{ t('login.featureLabel') }}</text>
+				</view>
+			</view>
+			<view class="preview-bars">
+				<view class="pv-col">
+					<view class="pv-bar" style="height: 34px;"></view>
+				</view>
+				<view class="pv-col">
+					<view class="pv-bar" style="height: 52px;"></view>
+				</view>
+				<view class="pv-col">
+					<view class="pv-bar" style="height: 42px;"></view>
+				</view>
+				<view class="pv-col">
+					<view class="pv-bar pv-bar-active" style="height: 72px;"></view>
+				</view>
+				<view class="pv-col">
+					<view class="pv-bar" style="height: 56px;"></view>
+				</view>
+				<view class="pv-col">
+					<view class="pv-bar" style="height: 48px;"></view>
+				</view>
+				<view class="pv-col">
+					<view class="pv-bar" style="height: 60px;"></view>
+				</view>
+			</view>
+			<view class="preview-foot">
+				<text class="preview-foot-text">01</text>
+				<text class="preview-foot-text">07</text>
+				<text class="preview-foot-text">14</text>
+				<text class="preview-foot-text">21</text>
+				<text class="preview-foot-text">28</text>
+			</view>
+			<view class="preview-divider"></view>
+			<view class="row justify-between items-center">
+				<view class="row items-center">
+					<view class="dot dot-mint"></view>
+					<text class="preview-meta">{{ t('login.feature1Sub') }}</text>
+					<view class="dot dot-orange preview-meta-dot"></view>
+					<text class="preview-meta">{{ t('login.feature2Sub') }}</text>
+				</view>
+				<text class="preview-meta">2026</text>
+			</view>
+		</view>
+
+		<view class="feature-row enter-rise enter-d3">
+			<view class="feature">
+				<view class="feature-icon feature-icon-mint">
+					<image class="feature-icon-img" src="/static/icons/ui-wallet-light.png" />
+				</view>
+				<text class="feature-title">{{ t('login.feature1Title') }}</text>
+				<text class="feature-sub">{{ t('login.feature1Sub') }}</text>
+			</view>
+			<view class="feature">
+				<view class="feature-icon feature-icon-orange">
+					<image class="feature-icon-img" src="/static/icons/ui-bell-light.png" />
+				</view>
+				<text class="feature-title">{{ t('login.feature2Title') }}</text>
+				<text class="feature-sub">{{ t('login.feature2Sub') }}</text>
+			</view>
+			<view class="feature feature-last">
+				<view class="feature-icon feature-icon-cream">
+					<image class="feature-icon-img" src="/static/icons/nav-chart.png" />
+				</view>
+				<text class="feature-title">{{ t('login.feature3Title') }}</text>
+				<text class="feature-sub">{{ t('login.feature3Sub') }}</text>
+			</view>
+		</view>
+
+		<view class="login-action enter-rise enter-d4">
+			<view class="btn btn-mint login-btn" hover-class="pressed" @click="handleLogin">
+				<!-- #ifdef WEB -->
+				<text class="login-btn-text">{{ loading ? t('login.loading') : t('login.demo') }}</text>
+				<!-- #endif -->
+				<!-- #ifndef WEB -->
+				<text class="login-btn-text">{{ loading ? t('login.loading') : t('login.wechat') }}</text>
+				<!-- #endif -->
+			</view>
+			<text class="login-agreement">{{ t('login.agreement') }}</text>
+			<!-- #ifdef WEB -->
+			<text class="login-demo-note">{{ t('login.localHint') }}</text>
+			<!-- #endif -->
+		</view>
+		<view style="height: 28px;"></view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { ref } from 'vue'
+	import AuroraBg from '@/components/aurora-bg.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs, setLocale } from '@/stores/prefs.uts'
+	import { applyLogin } from '@/stores/session.uts'
+	import { login } from '@/services/api.uts'
+
+	const loading = ref(false)
+
+	function chooseLocale(locale : string) : void {
+		setLocale(locale)
+	}
+
+	function handleLogin() : void {
+		if (loading.value) return
+		loading.value = true
+		// #ifdef WEB
+		performLogin('web-demo')
+		// #endif
+		// #ifdef MP-WEIXIN
+		uni.login({
+			provider: 'weixin',
+			success: (res) => {
+				performLogin(res.code)
+			},
+			fail: (_) => {
+				loading.value = false
+				uni.showToast({
+					title: t('login.failed'),
+					icon: 'none'
+				})
+			}
+		})
+		// #endif
+	}
+
+	async function performLogin(code : string) : Promise<void> {
+		try {
+			const result = await login(code)
+			applyLogin(result)
+			loading.value = false
+			uni.reLaunch({
+				url: '/pages/shell/shell'
+			})
+		} catch (e) {
+			loading.value = false
+			let message = t('login.failed')
+			if (e != null) {
+				const err = e as Error
+				const raw = err.message
+				if (raw.indexOf('AppSecret') >= 0 || raw.indexOf('APP_SECRET') >= 0) {
+					message = t('login.secretMissing')
+				} else if (raw.length > 0) {
+					message = raw
+				}
+			}
+			uni.showModal({
+				title: t('login.failed'),
+				content: message,
+				showCancel: false,
+				confirmText: t('common.done')
+			})
+		}
+	}
+</script>
+
+<style>
+	.login-page {
+		position: relative;
+		padding-left: 22px;
+		padding-right: 22px;
+		overflow: hidden;
+	}
+
+	.login-top,
+	.login-hero,
+	.preview-card,
+	.feature-row,
+	.login-action {
+		position: relative;
+		z-index: 1;
+	}
+
+	.deco-ring,
+	.deco-dot {
+		z-index: 0;
+	}
+
+	.deco-ring {
+		position: absolute;
+		width: 190px;
+		height: 190px;
+		border-radius: 95px;
+		border-width: 26px;
+		border-style: solid;
+		border-color: rgba(123,231,191,0.14);
+		right: -82px;
+		top: 92px;
+		opacity: 0.8;
+	}
+
+	.deco-dot {
+		position: absolute;
+		width: 16px;
+		height: 16px;
+		border-radius: 8px;
+		background-color: #F0A06A;
+		right: 45px;
+		top: 238px;
+	}
+
+	.login-top {
+		height: 48px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		z-index: 2;
+	}
+
+	.brand {
+		font-size: 17px;
+		font-weight: 800;
+		letter-spacing: -0.3px;
+		margin-left: 8px;
+		color: #F2F6F1;
+	}
+
+	.lang-switch {
+		height: 34px;
+		border-radius: 17px;
+		background-color: rgba(255,255,255,0.055);
+		background-image: linear-gradient(150deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 100%);
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+		flex-direction: row;
+		align-items: center;
+		padding: 3px;
+	}
+
+	.lang-item {
+		height: 28px;
+		min-width: 32px;
+		border-radius: 14px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.lang-item-on {
+		background-color: rgba(169,237,203,0.14);
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.28), inset 0 1px 0 rgba(255,255,255,0.16);
+	}
+
+	.lang-text {
+		font-size: 11px;
+		color: rgba(234,242,237,0.56);
+		font-weight: 600;
+	}
+
+	.lang-text-on {
+		color: #A9EDCB;
+		font-weight: 750;
+	}
+
+	.login-hero {
+		margin-top: 34px;
+		flex-direction: column;
+		z-index: 2;
+	}
+
+	.hero-wordmark {
+		font-size: 60px;
+		font-weight: 800;
+		letter-spacing: -3px;
+		color: #F2F6F1;
+		line-height: 66px;
+	}
+
+	.hero-tagline {
+		font-size: 21px;
+		font-weight: 750;
+		color: #F2F6F1;
+		margin-top: 10px;
+		letter-spacing: -0.2px;
+	}
+
+	.hero-sub {
+		font-size: 13px;
+		color: rgba(234,242,237,0.58);
+		line-height: 21px;
+		margin-top: 9px;
+		max-width: 310px;
+	}
+
+	.preview-card {
+		margin-top: 26px;
+		background-color: rgba(255,255,255,0.045);
+		background-image: linear-gradient(150deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.028) 46%, rgba(255,255,255,0.055) 100%);
+		border-radius: 26px;
+		padding: 18px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.18), 0 18px 40px rgba(0,0,0,0.46);
+		z-index: 2;
+	}
+
+	.preview-kicker {
+		font-size: 9px;
+		letter-spacing: 1.4px;
+		color: rgba(234,242,237,0.42);
+		font-weight: 700;
+	}
+
+	.preview-badge {
+		height: 22px;
+		border-radius: 11px;
+		background-color: rgba(123,231,191,0.12);
+		box-shadow: inset 0 0 0 1px rgba(123,231,191,0.22);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 8px;
+		padding-right: 8px;
+	}
+
+	.preview-badge-icon {
+		width: 11px;
+		height: 11px;
+	}
+
+	.preview-badge-text {
+		font-size: 8px;
+		color: #8FE3BC;
+		margin-left: 4px;
+		font-weight: 600;
+		letter-spacing: 0.4px;
+	}
+
+	.preview-bars {
+		height: 84px;
+		flex-direction: row;
+		align-items: flex-end;
+		margin-top: 16px;
+		padding-left: 4px;
+		padding-right: 4px;
+	}
+
+	.pv-col {
+		flex: 1;
+		align-items: center;
+		justify-content: flex-end;
+		height: 84px;
+	}
+
+	.pv-bar {
+		width: 26px;
+		border-radius: 9px;
+		background-color: rgba(255,255,255,0.08);
+		background-image: linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 100%);
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+	}
+
+	.pv-bar-active {
+		background-color: #A9EDCB;
+		background-image: linear-gradient(180deg, #D6F8E6 0%, #A9EDCB 46%, #7BE7BF 100%);
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 0 20px rgba(123,231,191,0.30);
+	}
+
+	.preview-foot {
+		flex-direction: row;
+		justify-content: space-between;
+		margin-top: 7px;
+		padding-left: 8px;
+		padding-right: 8px;
+	}
+
+	.preview-foot-text {
+		font-size: 8px;
+		color: rgba(234,242,237,0.26);
+	}
+
+	.preview-divider {
+		height: 1px;
+		background-color: rgba(255,255,255,0.08);
+		margin-top: 12px;
+		margin-bottom: 12px;
+	}
+
+	.preview-meta {
+		font-size: 9px;
+		color: rgba(234,242,237,0.52);
+	}
+
+	.preview-meta-dot {
+		margin-left: 12px;
+		margin-right: 6px;
+	}
+
+	.feature-row {
+		flex-direction: row;
+		margin-top: 14px;
+		z-index: 2;
+	}
+
+	.feature {
+		flex: 1;
+		background-color: rgba(255,255,255,0.045);
+		background-image: linear-gradient(150deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.028) 52%, rgba(255,255,255,0.05) 100%);
+		border-radius: 18px;
+		padding: 12px 10px;
+		margin-right: 8px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.16), 0 10px 24px rgba(0,0,0,0.30);
+		flex-direction: column;
+	}
+
+	.feature-icon {
+		width: 28px;
+		height: 28px;
+		border-radius: 9px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.feature-last {
+		margin-right: 0;
+	}
+
+	.feature-icon-mint {
+		background-color: rgba(123,231,191,0.14);
+		box-shadow: inset 0 0 0 1px rgba(123,231,191,0.24);
+	}
+
+	.feature-icon-orange {
+		background-color: rgba(240,160,106,0.14);
+		box-shadow: inset 0 0 0 1px rgba(240,160,106,0.24);
+	}
+
+	.feature-icon-cream {
+		background-color: rgba(255,255,255,0.09);
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16);
+	}
+
+	.feature-icon-img {
+		width: 14px;
+		height: 14px;
+	}
+
+	.feature-title {
+		font-size: 11px;
+		font-weight: 700;
+		color: #F2F6F1;
+		margin-top: 9px;
+	}
+
+	.feature-sub {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+	}
+
+	.login-action {
+		margin-top: 22px;
+		flex-direction: column;
+		z-index: 2;
+	}
+
+	.login-btn {
+		height: 56px;
+		border-radius: 18px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-start;
+		padding-left: 15px;
+		padding-right: 15px;
+	}
+
+	.login-btn-text {
+		flex: 1;
+		text-align: center;
+		color: #0B2117;
+		font-size: 15px;
+		font-weight: 750;
+	}
+
+	.login-agreement {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		text-align: center;
+		margin-top: 12px;
+		line-height: 15px;
+	}
+
+	.login-demo-note {
+		font-size: 9px;
+		color: rgba(234,242,237,0.30);
+		text-align: center;
+		margin-top: 5px;
+	}
+</style>

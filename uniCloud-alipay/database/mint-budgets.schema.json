@@ -1,0 +1,39 @@
+{
+  "bsonType": "object",
+  "required": ["openid", "categoryId", "amount", "currency", "alertAt"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "预算 ID"
+    },
+    "openid": {
+      "bsonType": "string",
+      "description": "所属用户 openid"
+    },
+    "categoryId": {
+      "bsonType": "string",
+      "description": "分类 ID，all 表示总预算"
+    },
+    "amount": {
+      "bsonType": "number"
+    },
+    "currency": {
+      "bsonType": "string"
+    },
+    "alertAt": {
+      "bsonType": "number",
+      "description": "提醒阈值百分比"
+    },
+    "createdAt": {
+      "bsonType": "number"
+    },
+    "updatedAt": {
+      "bsonType": "number"
+    }
+  }
+}

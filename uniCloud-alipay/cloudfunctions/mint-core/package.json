@@ -1,0 +1,8 @@
+{
+  "name": "mint-core",
+  "version": "1.0.0",
+  "description": "Mint personal finance cloud object",
+  "main": "index.obj.js",
+  "private": true,
+  "dependencies": {}
+}

@@ -1,0 +1,441 @@
+<template>
+	<view class="tab-view">
+		<view class="page-content">
+			<view class="topbar enter-fade">
+				<view class="head-left">
+					<text class="page-title">{{ t('records.title') }}</text>
+					<text class="page-sub">{{ t('records.subtitle') }}</text>
+				</view>
+				<view class="quick-add" @click="addEntry">
+					<image class="quick-add-icon" src="/static/icons/ui-plus-ink.png" />
+					<text class="quick-add-text">{{ t('records.add') }}</text>
+				</view>
+			</view>
+
+			<view class="row justify-between items-center month-row enter-rise enter-d1">
+				<month-switch :label="monthTitle" @prev="prevMonth" @next="nextMonth" />
+				<view class="count-pill">
+					<text class="count-pill-text">{{ countText }}</text>
+				</view>
+			</view>
+
+			<view v-if="!ledger.loaded" class="loading-wrap">
+				<image class="logo-40" src="/static/icons/logo-light.png" />
+				<text class="loading-text">{{ ledger.error.length > 0 ? t('common.networkError') : t('common.loading') }}</text>
+			</view>
+
+			<view v-else>
+				<view class="card summary-card enter-pop enter-d2">
+					<view class="row summary-row">
+						<view class="summary-col">
+							<view class="row items-center">
+								<view class="dot dot-mint"></view>
+								<text class="summary-label">{{ t('records.income') }}</text>
+							</view>
+							<text class="summary-value amount-pos">{{ incomeText }}</text>
+						</view>
+						<view class="summary-col summary-col-mid">
+							<view class="row items-center">
+								<view class="dot dot-orange"></view>
+								<text class="summary-label">{{ t('records.expense') }}</text>
+							</view>
+							<text class="summary-value amount-neg">{{ expenseText }}</text>
+						</view>
+						<view class="summary-col summary-col-right">
+							<view class="row items-center">
+								<view class="dot dot-ink"></view>
+								<text class="summary-label">{{ t('records.balance') }}</text>
+							</view>
+							<text class="summary-value">{{ balanceText }}</text>
+						</view>
+					</view>
+					<view class="flow-track">
+						<view v-if="incomeWidth > 0" class="flow-income" :style="'width: ' + incomeWidth + '%'"></view>
+						<view class="flow-expense"></view>
+					</view>
+				</view>
+
+				<view class="filter-row enter-rise enter-d3">
+					<view
+						v-for="item in filters"
+						:key="item.key"
+						:class="filter == item.key ? 'chip chip-active filter-chip' : 'chip filter-chip'"
+						@click="setFilter(item.key)"
+					>
+						<text :class="filter == item.key ? 'chip-text chip-text-active' : 'chip-text'">{{ item.label }}</text>
+					</view>
+				</view>
+
+				<view v-if="days.length == 0" class="mt-14 enter-rise enter-d4">
+					<empty-state
+						:title="t('records.empty')"
+						:subtitle="t('records.emptySub')"
+						:action="t('records.add')"
+						icon="/static/icons/logo-light.png"
+						@action="addEntry"
+					/>
+				</view>
+
+				<view v-else class="enter-rise enter-d4">
+					<view v-for="day in days" :key="day.key" class="day-block">
+						<view class="row justify-between items-center day-head">
+							<text class="day-label">{{ day.label }}</text>
+							<text class="day-count">{{ day.countText }}</text>
+						</view>
+						<view class="card day-card">
+							<view v-for="(tx, index) in day.items" :key="tx.id">
+								<tx-row :tx="tx" @tap="openTx(tx.id)" />
+								<view v-if="index < day.items.length - 1" class="divider"></view>
+							</view>
+						</view>
+					</view>
+				</view>
+
+				<view class="month-quote">
+					<image class="month-quote-icon" src="/static/icons/ui-sparkles-light.png" />
+					<text class="month-quote-text">{{ t('records.thisMonth') }}</text>
+				</view>
+
+				<view class="tabbar-space"></view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, onMounted, ref } from 'vue'
+	import MonthSwitch from '@/components/month-switch.uvue'
+	import TxRow from '@/components/tx-row.uvue'
+	import EmptyState from '@/components/empty-state.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs } from '@/stores/prefs.uts'
+	import { ledger, ensureLoaded, setMonth } from '@/stores/ledger.uts'
+	import { transactionsInMonth, monthSummary } from '@/utils/stats.uts'
+	import { addMonthsKey, monthLabel, friendlyDateLabel, groupDateKey } from '@/utils/date.uts'
+	import { formatCurrency } from '@/utils/money.uts'
+	import { Transaction } from '@/types/models.uts'
+
+	defineOptions({
+		styleIsolation: 'app'
+	})
+
+	type FilterOption = {
+		key : string
+		label : string
+	}
+
+	type DayGroupView = {
+		key : string
+		label : string
+		countText : string
+		items : Array<Transaction>
+	}
+
+	onMounted(() => {
+		ensureLoaded()
+	})
+
+	const filter = ref('all')
+
+	const monthTitle = computed(() : string => {
+		return monthLabel(ledger.currentMonth, prefs.locale)
+	})
+
+	const filters = computed<Array<FilterOption>>(() => {
+		const list : Array<FilterOption> = []
+		list.push({ key: 'all', label: t('records.filterAll') })
+		list.push({ key: 'expense', label: t('records.filterExpense') })
+		list.push({ key: 'income', label: t('records.filterIncome') })
+		return list
+	})
+
+	const monthTxs = computed(() => {
+		return transactionsInMonth(ledger.transactions, ledger.currentMonth)
+	})
+
+	const summary = computed(() => {
+		return monthSummary(ledger.transactions, ledger.currentMonth)
+	})
+
+	const incomeText = computed(() : string => {
+		return formatCurrency(summary.value.income, prefs.baseCurrency, prefs.locale)
+	})
+
+	const expenseText = computed(() : string => {
+		return formatCurrency(summary.value.expense, prefs.baseCurrency, prefs.locale)
+	})
+
+	const balanceText = computed(() : string => {
+		return formatCurrency(summary.value.balance, prefs.baseCurrency, prefs.locale)
+	})
+
+	const incomeWidth = computed(() : number => {
+		const total = summary.value.income + summary.value.expense
+		if (total <= 0) return 0
+		const pct = Math.round(summary.value.income / total * 100)
+		return pct < 6 ? 6 : pct
+	})
+
+	const countText = computed(() : string => {
+		return monthTxs.value.length.toString() + ' ' + t('records.entries')
+	})
+
+	const days = computed<Array<DayGroupView>>(() => {
+		const result : Array<DayGroupView> = []
+		for (let i = 0; i < monthTxs.value.length; i++) {
+			const tx = monthTxs.value[i]
+			if (filter.value != 'all' && tx.type != filter.value) continue
+			const key = groupDateKey(tx.date)
+			let found = false
+			for (let j = 0; j < result.length; j++) {
+				if (result[j].key == key) {
+					result[j].items.push(tx)
+					found = true
+					break
+				}
+			}
+			if (!found) {
+				const items : Array<Transaction> = []
+				items.push(tx)
+				result.push({
+					key: key,
+					label: '',
+					countText: '',
+					items: items
+				})
+			}
+		}
+		for (let i = 0; i < result.length; i++) {
+			result[i].label = friendlyDateLabel(result[i].items[0].date, prefs.locale)
+			result[i].countText = result[i].items.length.toString() + ' ' + t('records.entries')
+		}
+		return result
+	})
+
+	function setFilter(key : string) : void {
+		filter.value = key
+	}
+
+	function prevMonth() : void {
+		setMonth(addMonthsKey(ledger.currentMonth, -1))
+	}
+
+	function nextMonth() : void {
+		setMonth(addMonthsKey(ledger.currentMonth, 1))
+	}
+
+	function addEntry() : void {
+		uni.navigateTo({
+			url: '/pages/record-edit/record-edit'
+		})
+	}
+
+	function openTx(id : string) : void {
+		uni.navigateTo({
+			url: '/pages/record-edit/record-edit?id=' + id
+		})
+	}
+</script>
+
+<style>
+	.tab-view {
+		flex-direction: column;
+		position: relative;
+	}
+	.topbar {
+		padding-top: 2px;
+		padding-bottom: 2px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.head-left {
+		flex-direction: column;
+	}
+
+	.page-title {
+		font-size: 27px;
+		font-weight: 800;
+		letter-spacing: -0.8px;
+		color: #F2F6F1;
+	}
+
+	.page-sub {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		margin-top: 5px;
+	}
+
+	.quick-add {
+		height: 38px;
+		border-radius: 14px;
+		background-color: #A9EDCB;
+		background-image: linear-gradient(160deg, #D6F8E6 0%, #A9EDCB 52%, #8FE3BC 100%);
+		flex-direction: row;
+		align-items: center;
+		padding-left: 13px;
+		padding-right: 14px;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 18px rgba(143,227,188,0.28);
+	}
+
+	.quick-add-icon {
+		width: 15px;
+		height: 15px;
+	}
+
+	.quick-add-text {
+		font-size: 12px;
+		font-weight: 700;
+		color: #0B2117;
+		margin-left: 5px;
+	}
+
+	.month-row {
+		margin-top: 16px;
+	}
+
+	.count-pill {
+		height: 28px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.06);
+		padding-left: 11px;
+		padding-right: 11px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.10);
+	}
+
+	.count-pill-text {
+		font-size: 10px;
+		color: rgba(234,242,237,0.55);
+		font-weight: 600;
+	}
+
+	.summary-card {
+		margin-top: 12px;
+		padding-top: 16px;
+		padding-bottom: 15px;
+	}
+
+	.summary-row {
+		flex-direction: row;
+	}
+
+	.summary-col {
+		flex: 1;
+		flex-direction: column;
+	}
+
+	.summary-col-mid {
+		border-left-width: 1px;
+		border-left-style: solid;
+		border-left-color: rgba(255,255,255,0.09);
+		padding-left: 14px;
+	}
+
+	.summary-col-right {
+		border-left-width: 1px;
+		border-left-style: solid;
+		border-left-color: rgba(255,255,255,0.09);
+		padding-left: 14px;
+	}
+
+	.dot-ink {
+		background-color: rgba(245,247,244,0.55);
+	}
+
+	.summary-label {
+		font-size: 10px;
+		color: rgba(234,242,237,0.56);
+		margin-left: 6px;
+	}
+
+	.summary-value {
+		font-size: 16px;
+		font-weight: 750;
+		color: #F2F6F1;
+		margin-top: 7px;
+		letter-spacing: -0.3px;
+	}
+
+	.flow-track {
+		height: 5px;
+		border-radius: 3px;
+		background-color: rgba(240,160,106,0.22);
+		overflow: hidden;
+		margin-top: 15px;
+		flex-direction: row;
+	}
+
+	.flow-income {
+		height: 5px;
+		background-color: #6FE0B2;
+	}
+
+	.flow-expense {
+		flex: 1;
+		height: 5px;
+		background-color: #F0A06A;
+	}
+
+	.filter-row {
+		flex-direction: row;
+		margin-top: 14px;
+	}
+
+	.filter-chip {
+		margin-right: 8px;
+	}
+
+	.day-block {
+		margin-top: 16px;
+	}
+
+	.day-head {
+		padding-left: 4px;
+		padding-right: 4px;
+		margin-bottom: 8px;
+	}
+
+	.day-label {
+		font-size: 12px;
+		font-weight: 700;
+		color: rgba(234,242,237,0.64);
+	}
+
+	.day-count {
+		font-size: 10px;
+		color: rgba(234,242,237,0.38);
+	}
+
+	.day-card {
+		padding-top: 8px;
+		padding-bottom: 8px;
+	}
+
+	.month-quote {
+		margin-top: 22px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.month-quote-icon {
+		width: 13px;
+		height: 13px;
+		opacity: 0.45;
+	}
+
+	.month-quote-text {
+		font-size: 11px;
+		color: rgba(234,242,237,0.38);
+		margin-left: 6px;
+	}
+
+	.loading-text {
+		font-size: 12px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 14px;
+	}
+</style>

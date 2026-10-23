@@ -1,0 +1,38 @@
+{
+  "bsonType": "object",
+  "required": ["openid"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "用户记录 ID"
+    },
+    "openid": {
+      "bsonType": "string",
+      "description": "微信 openid，服务端唯一"
+    },
+    "nickname": {
+      "bsonType": "string",
+      "description": "昵称（可为空）"
+    },
+    "avatar": {
+      "bsonType": "string",
+      "description": "头像地址（可为空）"
+    },
+    "createdAt": {
+      "bsonType": "number",
+      "description": "首次登录时间戳"
+    },
+    "lastLoginAt": {
+      "bsonType": "number",
+      "description": "最近登录时间戳"
+    },
+    "updatedAt": {
+      "bsonType": "number"
+    }
+  }
+}

@@ -1,0 +1,131 @@
+import { reactive } from 'vue'
+import { Rate, Settings } from '@/types/models.uts'
+import { copyDefaultRates, DEFAULT_BASE_CURRENCY } from '@/constants/currencies.uts'
+
+export type PrefsState = {
+	locale : string
+	baseCurrency : string
+	rates : Array<Rate>
+	notifyWechat : boolean
+	hasLocal : boolean
+	initialized : boolean
+}
+
+const STORAGE_LOCALE = 'mint_locale'
+const STORAGE_BASE = 'mint_base_currency'
+const STORAGE_RATES = 'mint_rates'
+const STORAGE_NOTIFY = 'mint_notify'
+
+export const prefs = reactive({
+	locale: 'zh',
+	baseCurrency: DEFAULT_BASE_CURRENCY,
+	rates: copyDefaultRates(),
+	notifyWechat: false,
+	hasLocal: false,
+	initialized: false
+} as PrefsState)
+
+export function mergeRates(incoming : Array<Rate>) : Array<Rate> {
+	const merged = copyDefaultRates()
+	for (let i = 0; i < incoming.length; i++) {
+		const item = incoming[i]
+		if (item.rateCny > 0) {
+			for (let j = 0; j < merged.length; j++) {
+				if (merged[j].currency == item.currency) {
+					merged[j].rateCny = item.rateCny
+				}
+			}
+		}
+	}
+	return merged
+}
+
+export function initPrefs() : void {
+	if (prefs.initialized) return
+
+	const rawLocale = uni.getStorageSync(STORAGE_LOCALE)
+	if (typeof rawLocale == 'string') {
+		const value = rawLocale as string
+		if (value == 'en' || value == 'zh') {
+			prefs.locale = value
+			prefs.hasLocal = true
+		}
+	}
+
+	const rawBase = uni.getStorageSync(STORAGE_BASE)
+	if (typeof rawBase == 'string') {
+		const value = rawBase as string
+		if (value.length > 0) {
+			prefs.baseCurrency = value
+			prefs.hasLocal = true
+		}
+	}
+
+	const rawRates = uni.getStorageSync(STORAGE_RATES)
+	if (typeof rawRates == 'string') {
+		const value = rawRates as string
+		if (value.length > 0) {
+			const parsed = JSON.parse<Array<Rate>>(value)
+			if (parsed != null) {
+				prefs.rates = mergeRates(parsed)
+				prefs.hasLocal = true
+			}
+		}
+	}
+
+	const rawNotify = uni.getStorageSync(STORAGE_NOTIFY)
+	if (typeof rawNotify == 'boolean') {
+		prefs.notifyWechat = rawNotify as boolean
+	}
+
+	prefs.initialized = true
+}
+
+export function persistPrefs() : void {
+	uni.setStorageSync(STORAGE_LOCALE, prefs.locale)
+	uni.setStorageSync(STORAGE_BASE, prefs.baseCurrency)
+	uni.setStorageSync(STORAGE_RATES, JSON.stringify(prefs.rates))
+	uni.setStorageSync(STORAGE_NOTIFY, prefs.notifyWechat)
+	prefs.hasLocal = true
+}
+
+export function setLocale(locale : string) : void {
+	prefs.locale = locale == 'en' ? 'en' : 'zh'
+	persistPrefs()
+}
+
+export function setBaseCurrency(code : string) : void {
+	prefs.baseCurrency = code
+	persistPrefs()
+}
+
+export function setNotifyWechat(value : boolean) : void {
+	prefs.notifyWechat = value
+	persistPrefs()
+}
+
+export function setRates(rates : Array<Rate>) : void {
+	prefs.rates = mergeRates(rates)
+	persistPrefs()
+}
+
+export function applyServerSettings(settings : Settings) : void {
+	prefs.locale = settings.locale == 'en' ? 'en' : 'zh'
+	prefs.baseCurrency = settings.baseCurrency.length > 0 ? settings.baseCurrency : DEFAULT_BASE_CURRENCY
+	prefs.rates = mergeRates(settings.rates)
+	prefs.notifyWechat = settings.notifyWechat
+	persistPrefs()
+}
+
+export function prefsSnapshot() : Settings {
+	const rates : Array<Rate> = []
+	for (let i = 0; i < prefs.rates.length; i++) {
+		rates.push({ currency: prefs.rates[i].currency, rateCny: prefs.rates[i].rateCny })
+	}
+	return {
+		locale: prefs.locale,
+		baseCurrency: prefs.baseCurrency,
+		rates: rates,
+		notifyWechat: prefs.notifyWechat
+	}
+}

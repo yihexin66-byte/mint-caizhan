@@ -1,0 +1,494 @@
+import {
+	Budget,
+	BudgetInput,
+	Debt,
+	DebtInput,
+	LoginResult,
+	Rate,
+	Settings,
+	SettleResult,
+	Snapshot,
+	Transaction,
+	TransactionInput
+} from '@/types/models.uts'
+import { copyDefaultRates } from '@/constants/currencies.uts'
+
+let seeded = false
+let seq = 1
+let txStore : Array<Transaction> = []
+let debtStore : Array<Debt> = []
+let budgetStore : Array<Budget> = []
+let settingsStore : Settings = {
+	locale: 'zh',
+	baseCurrency: 'CNY',
+	rates: copyDefaultRates(),
+	notifyWechat: false
+}
+
+function nextId(prefix : string) : string {
+	seq++
+	return prefix + '_' + Date.now().toString() + '_' + seq.toString()
+}
+
+function tsAt(monthOffset : number, day : number, hour : number) : number {
+	const now = new Date()
+	return new Date(now.getFullYear(), now.getMonth() - monthOffset, day, hour, 0, 0, 0).getTime()
+}
+
+function tsDaysAgo(days : number) : number {
+	const now = new Date()
+	return new Date(now.getFullYear(), now.getMonth(), now.getDate() - days, 12, 0, 0, 0).getTime()
+}
+
+function currentDay(day : number, hour : number) : number {
+	const now = new Date()
+	const safe = day > now.getDate() ? now.getDate() : day
+	return new Date(now.getFullYear(), now.getMonth(), safe, hour, 0, 0, 0).getTime()
+}
+
+function addTx(
+	id : string,
+	type : string,
+	categoryId : string,
+	amount : number,
+	currency : string,
+	date : number,
+	note : string,
+	sourceDebtId : string
+) : Transaction {
+	const item : Transaction = {
+		id: id,
+		type: type,
+		amount: amount,
+		currency: currency,
+		categoryId: categoryId,
+		note: note,
+		date: date,
+		sourceDebtId: sourceDebtId,
+		createdAt: date,
+		updatedAt: date
+	}
+	txStore.push(item)
+	return item
+}
+
+function seed() : void {
+	if (seeded) return
+	seeded = true
+	const now = Date.now()
+
+	// 本月演示数据（若当天尚未到该日期，则落在今天）
+	addTx('demo_salary', 'income', 'salary', 18500, 'CNY', currentDay(5, 9), '十月薪资', '')
+	addTx('demo_bonus', 'income', 'bonus', 1200, 'CNY', currentDay(6, 18), '项目奖金', '')
+	addTx('demo_freelance', 'income', 'other_income', 320, 'USD', currentDay(4, 16), '品牌插画尾款', '')
+	addTx('demo_rent', 'expense', 'living', 4200, 'CNY', currentDay(2, 10), '房租', '')
+	addTx('demo_coffee', 'expense', 'food', 32, 'CNY', currentDay(1, 8), '楼下拿铁', '')
+	addTx('demo_lunch', 'expense', 'food', 128, 'CNY', currentDay(17, 13), '周末早午餐', '')
+	addTx('demo_noodle', 'expense', 'food', 36, 'CNY', currentDay(15, 19), '一碗热汤面', '')
+	addTx('demo_grocery', 'expense', 'food', 342.5, 'CNY', currentDay(12, 17), "Ole' 超市", '')
+	addTx('demo_muji', 'expense', 'shopping', 268, 'CNY', currentDay(16, 15), 'Muji 收纳盒', '')
+	addTx('demo_books', 'expense', 'shopping', 42, 'USD', currentDay(11, 14), '设计书店', '')
+	addTx('demo_phone', 'expense', 'bills', 99, 'CNY', currentDay(14, 10), '手机话费', '')
+	addTx('demo_movie', 'expense', 'entertainment', 88, 'CNY', currentDay(13, 20), '电影 · 深海', '')
+	addTx('demo_yoga', 'expense', 'health', 199, 'CNY', currentDay(10, 9), '瑜伽月卡', '')
+	addTx('demo_course', 'expense', 'education', 299, 'CNY', currentDay(9, 21), '插画课程', '')
+	addTx('demo_suzhou', 'expense', 'travel', 480, 'CNY', currentDay(8, 12), '苏州周末', '')
+	addTx('demo_gift', 'expense', 'gift', 168, 'CNY', currentDay(7, 16), '给妈妈的围巾', '')
+	addTx('demo_metro', 'expense', 'transport', 26, 'CNY', currentDay(19, 8), '地铁与共享单车', '')
+
+	// 过去 5 个月，供趋势图使用
+	for (let offset = 1; offset <= 5; offset++) {
+		addTx('past_salary_' + offset.toString(), 'income', 'salary', 18500, 'CNY', tsAt(offset, 5, 9), '月度薪资', '')
+		addTx('past_rent_' + offset.toString(), 'expense', 'living', 4200, 'CNY', tsAt(offset, 2, 10), '房租', '')
+		addTx('past_food_' + offset.toString(), 'expense', 'food', 780 + offset * 30, 'CNY', tsAt(offset, 10, 19), '日常餐饮', '')
+		addTx('past_shop_' + offset.toString(), 'expense', 'shopping', 420 + offset * 45, 'CNY', tsAt(offset, 16, 15), '生活购物', '')
+		addTx('past_transport_' + offset.toString(), 'expense', 'transport', 180 + offset * 10, 'CNY', tsAt(offset, 12, 8), '通勤交通', '')
+		addTx('past_fun_' + offset.toString(), 'expense', 'entertainment', 150, 'CNY', tsAt(offset, 20, 20), '周末电影', '')
+		addTx('past_bills_' + offset.toString(), 'expense', 'bills', 120, 'CNY', tsAt(offset, 22, 10), '水电账单', '')
+		if (offset == 2 || offset == 4) {
+			addTx('past_travel_' + offset.toString(), 'expense', 'travel', 1680, 'CNY', tsAt(offset, 24, 12), '短途旅行', '')
+		}
+		if (offset == 3) {
+			addTx('past_bonus_' + offset.toString(), 'income', 'bonus', 2600, 'CNY', tsAt(offset, 9, 18), '季度奖金', '')
+		}
+	}
+
+	// 已结清的往来，以及它自动生成的收入记录
+	const linkedIncome = addTx('demo_settled_income', 'income', 'debt_receive', 1200, 'CNY', tsDaysAgo(40), '结清 · Studio 插画尾款', 'demo_settled_debt')
+	debtStore.push({
+		id: 'demo_settled_debt',
+		direction: 'receivable',
+		counterparty: 'Studio 森',
+		amount: 1200,
+		currency: 'CNY',
+		dueDate: tsDaysAgo(45),
+		note: '插画尾款',
+		settled: true,
+		settledAt: tsDaysAgo(40),
+		linkedTxId: linkedIncome.id,
+		createdAt: tsDaysAgo(60),
+		updatedAt: tsDaysAgo(40)
+	})
+
+	debtStore.push({
+		id: 'demo_debt_lin',
+		direction: 'receivable',
+		counterparty: 'Lin',
+		amount: 2400,
+		currency: 'CNY',
+		dueDate: tsDaysAgo(-8),
+		note: '品牌插画尾款',
+		settled: false,
+		settledAt: 0,
+		linkedTxId: '',
+		createdAt: tsDaysAgo(12),
+		updatedAt: tsDaysAgo(12)
+	})
+	debtStore.push({
+		id: 'demo_debt_chen',
+		direction: 'receivable',
+		counterparty: 'Chen',
+		amount: 680,
+		currency: 'HKD',
+		dueDate: tsDaysAgo(-18),
+		note: '旅行代订酒店',
+		settled: false,
+		settledAt: 0,
+		linkedTxId: '',
+		createdAt: tsDaysAgo(6),
+		updatedAt: tsDaysAgo(6)
+	})
+	debtStore.push({
+		id: 'demo_debt_alex',
+		direction: 'payable',
+		counterparty: 'Alex',
+		amount: 128,
+		currency: 'CNY',
+		dueDate: tsDaysAgo(-2),
+		note: '晚餐 AA',
+		settled: false,
+		settledAt: 0,
+		linkedTxId: '',
+		createdAt: tsDaysAgo(3),
+		updatedAt: tsDaysAgo(3)
+	})
+	debtStore.push({
+		id: 'demo_debt_landlord',
+		direction: 'payable',
+		counterparty: '房东',
+		amount: 260,
+		currency: 'CNY',
+		dueDate: tsDaysAgo(3),
+		note: '维修分摊',
+		settled: false,
+		settledAt: 0,
+		linkedTxId: '',
+		createdAt: tsDaysAgo(14),
+		updatedAt: tsDaysAgo(14)
+	})
+
+	budgetStore.push({
+		id: 'demo_budget_all',
+		categoryId: 'all',
+		amount: 8000,
+		currency: 'CNY',
+		alertAt: 85,
+		createdAt: now,
+		updatedAt: now
+	})
+	budgetStore.push({
+		id: 'demo_budget_food',
+		categoryId: 'food',
+		amount: 600,
+		currency: 'CNY',
+		alertAt: 80,
+		createdAt: now,
+		updatedAt: now
+	})
+	budgetStore.push({
+		id: 'demo_budget_shopping',
+		categoryId: 'shopping',
+		amount: 900,
+		currency: 'CNY',
+		alertAt: 80,
+		createdAt: now,
+		updatedAt: now
+	})
+	budgetStore.push({
+		id: 'demo_budget_transport',
+		categoryId: 'transport',
+		amount: 300,
+		currency: 'CNY',
+		alertAt: 90,
+		createdAt: now,
+		updatedAt: now
+	})
+}
+
+export async function mockLogin(code : string) : Promise<LoginResult> {
+	seed()
+	const result : LoginResult = {
+		token: 'demo-token-' + Date.now().toString(),
+		user: { id: 'demo-user', nickname: 'Alex', avatar: '' },
+		isNewUser: false
+	}
+	return result
+}
+
+export async function mockFetchSnapshot() : Promise<Snapshot> {
+	seed()
+	return {
+		transactions: txStore.slice(0),
+		debts: debtStore.slice(0),
+		budgets: budgetStore.slice(0),
+		settings: {
+			locale: settingsStore.locale,
+			baseCurrency: settingsStore.baseCurrency,
+			rates: settingsStore.rates.slice(0),
+			notifyWechat: settingsStore.notifyWechat
+		}
+	}
+}
+
+function findTx(id : string) : number {
+	for (let i = 0; i < txStore.length; i++) {
+		if (txStore[i].id == id) return i
+	}
+	return -1
+}
+
+export async function mockSaveTransaction(input : TransactionInput) : Promise<Transaction> {
+	seed()
+	const now = Date.now()
+	if (input.id.length > 0) {
+		const index = findTx(input.id)
+		if (index >= 0) {
+			const existing = txStore[index]
+			if (existing.sourceDebtId.length > 0) {
+				throw new Error('LINKED_TX')
+			}
+			const updated : Transaction = {
+				id: existing.id,
+				type: input.type,
+				amount: input.amount,
+				currency: input.currency,
+				categoryId: input.categoryId,
+				note: input.note,
+				date: input.date,
+				sourceDebtId: '',
+				createdAt: existing.createdAt,
+				updatedAt: now
+			}
+			txStore[index] = updated
+			return updated
+		}
+	}
+	const item : Transaction = {
+		id: nextId('tx'),
+		type: input.type,
+		amount: input.amount,
+		currency: input.currency,
+		categoryId: input.categoryId,
+		note: input.note,
+		date: input.date,
+		sourceDebtId: '',
+		createdAt: now,
+		updatedAt: now
+	}
+	txStore.push(item)
+	return item
+}
+
+export async function mockDeleteTransaction(id : string) : Promise<boolean> {
+	seed()
+	const index = findTx(id)
+	if (index >= 0) {
+		if (txStore[index].sourceDebtId.length > 0) {
+			throw new Error('LINKED_TX')
+		}
+		txStore.splice(index, 1)
+	}
+	return true
+}
+
+export async function mockSaveBudget(input : BudgetInput) : Promise<Budget> {
+	seed()
+	const now = Date.now()
+	if (input.id.length > 0) {
+		for (let i = 0; i < budgetStore.length; i++) {
+			if (budgetStore[i].id == input.id) {
+				const updated : Budget = {
+					id: budgetStore[i].id,
+					categoryId: input.categoryId,
+					amount: input.amount,
+					currency: input.currency,
+					alertAt: input.alertAt,
+					createdAt: budgetStore[i].createdAt,
+					updatedAt: now
+				}
+				budgetStore[i] = updated
+				return updated
+			}
+		}
+	}
+	for (let i = 0; i < budgetStore.length; i++) {
+		if (budgetStore[i].categoryId == input.categoryId) {
+			const updated : Budget = {
+				id: budgetStore[i].id,
+				categoryId: input.categoryId,
+				amount: input.amount,
+				currency: input.currency,
+				alertAt: input.alertAt,
+				createdAt: budgetStore[i].createdAt,
+				updatedAt: now
+			}
+			budgetStore[i] = updated
+			return updated
+		}
+	}
+	const item : Budget = {
+		id: nextId('budget'),
+		categoryId: input.categoryId,
+		amount: input.amount,
+		currency: input.currency,
+		alertAt: input.alertAt,
+		createdAt: now,
+		updatedAt: now
+	}
+	budgetStore.push(item)
+	return item
+}
+
+export async function mockDeleteBudget(id : string) : Promise<boolean> {
+	seed()
+	for (let i = 0; i < budgetStore.length; i++) {
+		if (budgetStore[i].id == id) {
+			budgetStore.splice(i, 1)
+			break
+		}
+	}
+	return true
+}
+
+export async function mockSaveDebt(input : DebtInput) : Promise<Debt> {
+	seed()
+	const now = Date.now()
+	if (input.id.length > 0) {
+		for (let i = 0; i < debtStore.length; i++) {
+			if (debtStore[i].id == input.id) {
+				const existing = debtStore[i]
+				if (existing.settled) {
+					throw new Error('DEBT_SETTLED')
+				}
+				const updated : Debt = {
+					id: existing.id,
+					direction: input.direction,
+					counterparty: input.counterparty,
+					amount: input.amount,
+					currency: input.currency,
+					dueDate: input.dueDate,
+					note: input.note,
+					settled: false,
+					settledAt: 0,
+					linkedTxId: '',
+					createdAt: existing.createdAt,
+					updatedAt: now
+				}
+				debtStore[i] = updated
+				return updated
+			}
+		}
+	}
+	const item : Debt = {
+		id: nextId('debt'),
+		direction: input.direction,
+		counterparty: input.counterparty,
+		amount: input.amount,
+		currency: input.currency,
+		dueDate: input.dueDate,
+		note: input.note,
+		settled: false,
+		settledAt: 0,
+		linkedTxId: '',
+		createdAt: now,
+		updatedAt: now
+	}
+	debtStore.push(item)
+	return item
+}
+
+export async function mockSettleDebt(id : string) : Promise<SettleResult> {
+	seed()
+	for (let i = 0; i < debtStore.length; i++) {
+		const debt = debtStore[i]
+		if (debt.id != id) continue
+		if (debt.settled) {
+			throw new Error('DEBT_SETTLED')
+		}
+		const now = Date.now()
+		const type = debt.direction == 'receivable' ? 'income' : 'expense'
+		const categoryId = debt.direction == 'receivable' ? 'debt_receive' : 'debt_pay'
+		const created = addTx(
+			nextId('tx'),
+			type,
+			categoryId,
+			debt.amount,
+			debt.currency,
+			now,
+			(debt.direction == 'receivable' ? '收回 · ' : '结清 · ') + debt.counterparty,
+			debt.id
+		)
+		const updated : Debt = {
+			id: debt.id,
+			direction: debt.direction,
+			counterparty: debt.counterparty,
+			amount: debt.amount,
+			currency: debt.currency,
+			dueDate: debt.dueDate,
+			note: debt.note,
+			settled: true,
+			settledAt: now,
+			linkedTxId: created.id,
+			createdAt: debt.createdAt,
+			updatedAt: now
+		}
+		debtStore[i] = updated
+		return { debt: updated, transaction: created }
+	}
+	throw new Error('NOT_FOUND')
+}
+
+export async function mockDeleteDebt(id : string) : Promise<boolean> {
+	seed()
+	for (let i = 0; i < debtStore.length; i++) {
+		if (debtStore[i].id == id) {
+			if (debtStore[i].settled) {
+				throw new Error('DEBT_SETTLED')
+			}
+			debtStore.splice(i, 1)
+			break
+		}
+	}
+	return true
+}
+
+export async function mockSaveSettings(settings : Settings) : Promise<Settings> {
+	seed()
+	settingsStore = {
+		locale: settings.locale,
+		baseCurrency: settings.baseCurrency,
+		rates: settings.rates.slice(0),
+		notifyWechat: settings.notifyWechat
+	}
+	return settings
+}
+
+export async function mockRegisterSubscription(templateId : string, accepted : boolean) : Promise<boolean> {
+	seed()
+	settingsStore.notifyWechat = accepted
+	return accepted
+}
+
+export function mockSeedRates() : Array<Rate> {
+	return copyDefaultRates()
+}

@@ -1,0 +1,49 @@
+import { Rate, CurrencyDef } from '@/types/models.uts'
+
+export const CURRENCIES : Array<CurrencyDef> = [
+	{ code: 'CNY', symbol: '¥', nameZh: '人民币', nameEn: 'Chinese Yuan', decimals: 2, fallbackRate: 1 },
+	{ code: 'USD', symbol: '$', nameZh: '美元', nameEn: 'US Dollar', decimals: 2, fallbackRate: 7.18 },
+	{ code: 'EUR', symbol: '€', nameZh: '欧元', nameEn: 'Euro', decimals: 2, fallbackRate: 7.82 },
+	{ code: 'JPY', symbol: '¥', nameZh: '日元', nameEn: 'Japanese Yen', decimals: 0, fallbackRate: 0.0478 },
+	{ code: 'HKD', symbol: 'HK$', nameZh: '港币', nameEn: 'Hong Kong Dollar', decimals: 2, fallbackRate: 0.92 },
+	{ code: 'GBP', symbol: '£', nameZh: '英镑', nameEn: 'Pound Sterling', decimals: 2, fallbackRate: 9.21 },
+	{ code: 'SGD', symbol: 'S$', nameZh: '新加坡元', nameEn: 'Singapore Dollar', decimals: 2, fallbackRate: 5.34 }
+]
+
+export const DEFAULT_BASE_CURRENCY = 'CNY'
+
+export const DEFAULT_RATES : Array<Rate> = [
+	{ currency: 'CNY', rateCny: 1 },
+	{ currency: 'USD', rateCny: 7.18 },
+	{ currency: 'EUR', rateCny: 7.82 },
+	{ currency: 'JPY', rateCny: 0.0478 },
+	{ currency: 'HKD', rateCny: 0.92 },
+	{ currency: 'GBP', rateCny: 9.21 },
+	{ currency: 'SGD', rateCny: 5.34 }
+]
+
+export function currencyByCode(code : string) : CurrencyDef {
+	for (let i = 0; i < CURRENCIES.length; i++) {
+		if (CURRENCIES[i].code == code) {
+			return CURRENCIES[i]
+		}
+	}
+	return CURRENCIES[0]
+}
+
+export function currencyName(code : string, locale : string) : string {
+	const item = currencyByCode(code)
+	return locale == 'en' ? item.nameEn : item.nameZh
+}
+
+export function defaultRateFor(code : string) : number {
+	return currencyByCode(code).fallbackRate
+}
+
+export function copyDefaultRates() : Array<Rate> {
+	const result : Array<Rate> = []
+	for (let i = 0; i < DEFAULT_RATES.length; i++) {
+		result.push({ currency: DEFAULT_RATES[i].currency, rateCny: DEFAULT_RATES[i].rateCny })
+	}
+	return result
+}

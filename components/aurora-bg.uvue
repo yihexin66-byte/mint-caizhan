@@ -1,0 +1,150 @@
+<template>
+	<view :class="'aurora aurora-' + props.level">
+		<view class="aurora-base"></view>
+		<view class="aurora-mint"></view>
+		<view class="aurora-teal"></view>
+		<view class="aurora-blue"></view>
+		<view class="aurora-speck aurora-speck-a"></view>
+		<view class="aurora-speck aurora-speck-b"></view>
+		<view class="aurora-speck aurora-speck-c"></view>
+		<view class="aurora-grain"></view>
+		<view class="aurora-topline"></view>
+		<view class="aurora-vignette"></view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	const props = defineProps({
+		level: {
+			type: String,
+			default: 'mid'
+		}
+	})
+</script>
+
+<style>
+	.aurora {
+		position: fixed;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		z-index: 0;
+		overflow: hidden;
+		pointer-events: none;
+		background-color: #060807;
+	}
+
+	.aurora-high {
+		opacity: 1;
+	}
+
+	.aurora-mid {
+		opacity: 0.84;
+	}
+
+	.aurora-low {
+		opacity: 0.64;
+	}
+
+	.aurora-base {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		height: 62%;
+		background-image: linear-gradient(180deg, rgba(16,27,22,0.72) 0%, rgba(12,20,17,0.34) 38%, rgba(6,8,7,0) 100%);
+	}
+
+	.aurora-mint {
+		position: absolute;
+		left: -190px;
+		top: -250px;
+		width: 720px;
+		height: 700px;
+		border-radius: 360px;
+		background-image: radial-gradient(50% 50% at 50% 50%, rgba(143,227,188,0.30) 0%, rgba(123,231,191,0.13) 38%, rgba(76,169,133,0.045) 62%, rgba(6,8,7,0) 78%);
+	}
+
+	.aurora-teal {
+		position: absolute;
+		right: -210px;
+		top: -190px;
+		width: 660px;
+		height: 620px;
+		border-radius: 330px;
+		background-image: radial-gradient(50% 50% at 50% 50%, rgba(75,143,200,0.26) 0%, rgba(69,127,176,0.10) 40%, rgba(56,102,142,0.035) 64%, rgba(6,8,7,0) 80%);
+	}
+
+	.aurora-blue {
+		position: absolute;
+		left: 8%;
+		top: 150px;
+		width: 84%;
+		height: 520px;
+		border-radius: 260px;
+		background-image: radial-gradient(50% 50% at 50% 50%, rgba(86,135,150,0.10) 0%, rgba(70,112,128,0.035) 46%, rgba(6,8,7,0) 76%);
+	}
+
+	.aurora-speck {
+		position: absolute;
+		width: 4px;
+		height: 4px;
+		border-radius: 2px;
+		background-color: #DFF7EC;
+	}
+
+	.aurora-speck-a {
+		left: 18%;
+		top: 21%;
+		opacity: 0.34;
+		box-shadow: 0 0 20px 3px rgba(143,227,188,0.28);
+	}
+
+	.aurora-speck-b {
+		right: 16%;
+		top: 13%;
+		width: 3px;
+		height: 3px;
+		opacity: 0.26;
+		box-shadow: 0 0 16px 3px rgba(111,177,220,0.26);
+	}
+
+	.aurora-speck-c {
+		right: 26%;
+		top: 38%;
+		width: 2px;
+		height: 2px;
+		opacity: 0.18;
+		box-shadow: 0 0 14px 2px rgba(223,247,236,0.24);
+	}
+
+	.aurora-grain {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		background-image: url('/static/textures/grain.png');
+		background-repeat: repeat;
+		opacity: 0.55;
+	}
+
+	.aurora-topline {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		height: 1px;
+		background-image: linear-gradient(90deg, rgba(143,227,188,0) 0%, rgba(143,227,188,0.30) 22%, rgba(111,177,220,0.20) 58%, rgba(143,227,188,0) 100%);
+	}
+
+	.aurora-vignette {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 48%;
+		background-image: linear-gradient(180deg, rgba(6,8,7,0) 0%, rgba(4,6,5,0.34) 58%, rgba(3,4,4,0.72) 100%);
+	}
+</style>

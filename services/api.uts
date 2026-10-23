@@ -1,0 +1,143 @@
+import {
+	Budget,
+	BudgetInput,
+	Debt,
+	DebtInput,
+	LoginResult,
+	Settings,
+	SettleResult,
+	Snapshot,
+	Transaction,
+	TransactionInput
+} from '@/types/models.uts'
+
+// #ifdef WEB
+import {
+	mockLogin,
+	mockFetchSnapshot,
+	mockSaveTransaction,
+	mockDeleteTransaction,
+	mockSaveBudget,
+	mockDeleteBudget,
+	mockSaveDebt,
+	mockSettleDebt,
+	mockDeleteDebt,
+	mockSaveSettings,
+	mockRegisterSubscription
+} from './mock.uts'
+// #endif
+
+// #ifndef WEB
+import {
+	cloudLogin,
+	cloudFetchSnapshot,
+	cloudSaveTransaction,
+	cloudDeleteTransaction,
+	cloudSaveBudget,
+	cloudDeleteBudget,
+	cloudSaveDebt,
+	cloudSettleDebt,
+	cloudDeleteDebt,
+	cloudSaveSettings,
+	cloudRegisterSubscription
+} from './cloud.uts'
+// #endif
+
+export async function login(code : string) : Promise<LoginResult> {
+	// #ifdef WEB
+	return mockLogin(code)
+	// #endif
+	// #ifndef WEB
+	return cloudLogin(code)
+	// #endif
+}
+
+export async function fetchSnapshot() : Promise<Snapshot> {
+	// #ifdef WEB
+	return mockFetchSnapshot()
+	// #endif
+	// #ifndef WEB
+	return cloudFetchSnapshot()
+	// #endif
+}
+
+export async function saveTransaction(input : TransactionInput) : Promise<Transaction> {
+	// #ifdef WEB
+	return mockSaveTransaction(input)
+	// #endif
+	// #ifndef WEB
+	return cloudSaveTransaction(input)
+	// #endif
+}
+
+export async function deleteTransaction(id : string) : Promise<boolean> {
+	// #ifdef WEB
+	return mockDeleteTransaction(id)
+	// #endif
+	// #ifndef WEB
+	return cloudDeleteTransaction(id)
+	// #endif
+}
+
+export async function saveBudget(input : BudgetInput) : Promise<Budget> {
+	// #ifdef WEB
+	return mockSaveBudget(input)
+	// #endif
+	// #ifndef WEB
+	return cloudSaveBudget(input)
+	// #endif
+}
+
+export async function deleteBudget(id : string) : Promise<boolean> {
+	// #ifdef WEB
+	return mockDeleteBudget(id)
+	// #endif
+	// #ifndef WEB
+	return cloudDeleteBudget(id)
+	// #endif
+}
+
+export async function saveDebt(input : DebtInput) : Promise<Debt> {
+	// #ifdef WEB
+	return mockSaveDebt(input)
+	// #endif
+	// #ifndef WEB
+	return cloudSaveDebt(input)
+	// #endif
+}
+
+export async function settleDebt(id : string) : Promise<SettleResult> {
+	// #ifdef WEB
+	return mockSettleDebt(id)
+	// #endif
+	// #ifndef WEB
+	return cloudSettleDebt(id)
+	// #endif
+}
+
+export async function deleteDebt(id : string) : Promise<boolean> {
+	// #ifdef WEB
+	return mockDeleteDebt(id)
+	// #endif
+	// #ifndef WEB
+	return cloudDeleteDebt(id)
+	// #endif
+}
+
+export async function saveSettings(settings : Settings) : Promise<Settings> {
+	// #ifdef WEB
+	return mockSaveSettings(settings)
+	// #endif
+	// #ifndef WEB
+	return cloudSaveSettings(settings)
+	// #endif
+}
+
+export async function registerSubscription(templateId : string, accepted : boolean) : Promise<boolean> {
+	// #ifdef WEB
+	return mockRegisterSubscription(templateId, accepted)
+	// #endif
+	// #ifndef WEB
+	return cloudRegisterSubscription(templateId, accepted)
+	// #endif
+}

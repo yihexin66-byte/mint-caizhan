@@ -1,0 +1,1332 @@
+<template>
+	<view class="page">
+		<aurora-bg level="low" />
+		<view class="status-spacer"></view>
+		<view class="page-content">
+			<view class="topbar enter-fade">
+				<view class="row items-center">
+					<view class="back-btn" @click="goBack">
+						<image class="icon-18" src="/static/icons/ui-back-light.png" />
+					</view>
+					<view class="head-left">
+						<text class="page-title">{{ t('settings.title') }}</text>
+						<text class="page-sub">{{ t('settings.subtitle') }}</text>
+					</view>
+				</view>
+				<view class="version-pill">
+					<text class="version-pill-text">v{{ APP_VERSION }}</text>
+				</view>
+			</view>
+
+			<view v-if="!ledger.loaded" class="loading-wrap">
+				<image class="logo-40" src="/static/icons/logo-light.png" />
+				<text class="loading-text">{{ ledger.error.length > 0 ? t('common.networkError') : t('common.loading') }}</text>
+			</view>
+
+			<view v-else>
+				<view class="card profile-card enter-pop enter-d2">
+					<view class="profile-orb"></view>
+					<view class="row items-center profile-head">
+						<view class="avatar-wrap" @click="openAvatarSheet">
+							<view class="avatar-big">
+								<image v-if="session.avatarUrl.length > 0" class="avatar-big-image" :src="session.avatarUrl" mode="aspectFill" />
+								<text v-else class="avatar-big-letter">{{ avatarLetter }}</text>
+							</view>
+							<view class="avatar-badge">
+								<image class="avatar-badge-icon" src="/static/icons/ui-plus-ink.png" />
+							</view>
+						</view>
+						<view class="grow profile-main" @click="openNameDialog">
+							<view class="row items-center">
+								<text class="profile-name">{{ userName }}</text>
+								<image class="profile-edit" src="/static/icons/ui-edit-light.png" />
+							</view>
+							<view class="row items-center profile-status-row">
+								<view class="status-dot"></view>
+								<text class="profile-status">{{ accountLabel }}</text>
+							</view>
+						</view>
+						<view class="member-pill">
+							<text class="member-pill-text">{{ t('settings.member') }}</text>
+						</view>
+					</view>
+
+					<view class="divider profile-divider"></view>
+
+					<view class="row items-center justify-between profile-foot">
+						<view class="row items-center">
+							<view class="cloud-dot"></view>
+							<text class="profile-foot-text">{{ t('settings.synced') }}</text>
+						</view>
+						<text class="profile-foot-code">{{ t('settings.cloudObject') }}</text>
+					</view>
+				</view>
+
+				<view class="section-header enter-rise enter-d3">
+					<text class="section-title">{{ t('settings.preferences') }}</text>
+				</view>
+
+				<view class="card prefs-card enter-rise enter-d4">
+					<view class="pref-row">
+						<view class="pref-icon">
+							<image class="icon-18" src="/static/icons/ui-globe-light.png" />
+						</view>
+						<view class="grow pref-main">
+							<text class="pref-title">{{ t('settings.language') }}</text>
+							<text class="pref-sub">{{ prefs.locale == 'en' ? 'English' : '简体中文' }}</text>
+						</view>
+						<view class="seg">
+							<view :class="prefs.locale == 'zh' ? 'seg-item seg-item-active' : 'seg-item'" @click.stop="chooseLocale('zh')">
+								<text :class="prefs.locale == 'zh' ? 'seg-text seg-text-active' : 'seg-text'">中</text>
+							</view>
+							<view :class="prefs.locale == 'en' ? 'seg-item seg-item-active' : 'seg-item'" @click.stop="chooseLocale('en')">
+								<text :class="prefs.locale == 'en' ? 'seg-text seg-text-active' : 'seg-text'">EN</text>
+							</view>
+						</view>
+					</view>
+
+					<view class="divider pref-divider"></view>
+
+					<view class="pref-row" @click="openCurrencySheet">
+						<view class="pref-icon">
+							<image class="icon-18" src="/static/icons/ui-wallet-light.png" />
+						</view>
+						<view class="grow pref-main">
+							<text class="pref-title">{{ t('settings.currency') }}</text>
+							<text class="pref-sub">{{ baseCurrencyName }}</text>
+						</view>
+						<text class="pref-value">{{ prefs.baseCurrency }} {{ baseSymbol }}</text>
+						<image class="chevron" src="/static/icons/ui-right-light.png" />
+					</view>
+
+					<view class="divider pref-divider"></view>
+
+					<view class="pref-row" @click="openRates">
+						<view class="pref-icon">
+							<image class="icon-18" src="/static/icons/ui-swap-light.png" />
+						</view>
+						<view class="grow pref-main">
+							<text class="pref-title">{{ t('settings.rates') }}</text>
+							<text class="pref-sub">{{ t('settings.ratesHint') }}</text>
+						</view>
+						<text class="pref-value">{{ t('settings.ratesValue') }}</text>
+						<image class="chevron" src="/static/icons/ui-right-light.png" />
+					</view>
+
+					<view class="divider pref-divider"></view>
+
+					<view class="pref-row">
+						<view class="pref-icon">
+							<image class="icon-18" src="/static/icons/ui-bell-light.png" />
+						</view>
+						<view class="grow pref-main">
+							<text class="pref-title">{{ t('settings.notify') }}</text>
+							<text class="pref-sub">{{ prefs.notifyWechat ? t('settings.on') : t('settings.off') }}</text>
+						</view>
+						<view :class="prefs.notifyWechat ? 'toggle toggle-on' : 'toggle'" @click.stop="toggleNotify">
+							<view :class="prefs.notifyWechat ? 'knob knob-on' : 'knob'"></view>
+						</view>
+					</view>
+				</view>
+
+				<view class="section-header enter-rise enter-d3">
+					<text class="section-title">{{ t('settings.data') }}</text>
+				</view>
+
+				<view class="card prefs-card enter-rise enter-d4">
+					<view class="pref-row" @click="syncNow">
+						<view class="pref-icon">
+							<image class="icon-18" src="/static/icons/ui-refresh-light.png" />
+						</view>
+						<view class="grow pref-main">
+							<text class="pref-title">{{ t('settings.refresh') }}</text>
+							<text class="pref-sub">{{ refreshing ? t('common.loading') : t('settings.syncNow') }}</text>
+						</view>
+						<view :class="refreshing ? 'refresh-icon spinning' : 'refresh-icon'">
+							<image class="icon-16 refresh-glyph" src="/static/icons/ui-refresh-light.png" />
+						</view>
+					</view>
+
+					<view class="divider pref-divider"></view>
+
+					<view class="pref-row">
+						<view class="pref-icon">
+							<image class="icon-18" src="/static/icons/ui-shield-light.png" />
+						</view>
+						<view class="grow pref-main">
+							<text class="pref-title">{{ t('settings.privacy') }}</text>
+							<text class="pref-sub">{{ sessionLabel }}</text>
+						</view>
+					</view>
+				</view>
+
+				<view class="section-header enter-rise enter-d3">
+					<text class="section-title">{{ t('settings.about') }}</text>
+				</view>
+
+				<view class="card about-card enter-rise enter-d5">
+					<view class="row items-center">
+						<image class="logo-40" src="/static/icons/logo-light.png" />
+						<view class="grow about-main">
+							<text class="about-name">Mint</text>
+							<text class="about-version">{{ t('settings.version') }} {{ APP_VERSION }} · {{ t('settings.cloudObject') }}</text>
+						</view>
+						<view class="about-badge">
+							<image class="about-badge-icon" src="/static/icons/ui-sparkles-light.png" />
+						</view>
+					</view>
+					<text class="about-text">{{ t('settings.aboutText') }}</text>
+					<view class="divider about-divider"></view>
+					<text class="about-thanks">{{ t('settings.aboutThanks') }}</text>
+				</view>
+
+				<view class="logout-row" @click="askLogout">
+					<image class="logout-icon" src="/static/icons/ui-logout-light.png" />
+					<text class="logout-text">{{ t('settings.logout') }}</text>
+				</view>
+
+				<view class="bottom-space"></view>
+			</view>
+		</view>
+
+		<view v-if="sheetOpen" class="modal-mask" @click="closeCurrencySheet">
+			<view class="sheet currency-sheet" @click.stop>
+				<view class="sheet-handle"></view>
+				<text class="sheet-title">{{ t('settings.currency') }}</text>
+				<text class="sheet-sub">{{ t('settings.ratesHint') }}</text>
+				<view
+					v-for="item in currencies"
+					:key="item.code"
+					class="currency-item"
+					@click="chooseBaseCurrency(item.code)"
+				>
+					<view :class="prefs.baseCurrency == item.code ? 'currency-tile currency-tile-active' : 'currency-tile'">
+						<text :class="prefs.baseCurrency == item.code ? 'currency-symbol currency-symbol-active' : 'currency-symbol'">{{ item.symbol }}</text>
+					</view>
+					<view class="grow currency-main">
+						<text class="currency-name">{{ currencyName(item.code, prefs.locale) }}</text>
+						<text class="currency-code">{{ item.code }}</text>
+					</view>
+					<view v-if="prefs.baseCurrency == item.code" class="currency-check">
+						<image class="icon-16" src="/static/icons/ui-check-light.png" />
+					</view>
+				</view>
+				<view class="sheet-bottom"></view>
+			</view>
+		</view>
+
+		<view v-if="avatarSheetOpen" class="modal-mask" @click="closeAvatarSheet">
+			<view class="sheet" @click.stop>
+				<view class="sheet-handle"></view>
+				<text class="sheet-title">{{ t('profile.avatarTitle') }}</text>
+				<text class="sheet-sub">{{ t('profile.avatarSub') }}</text>
+				<view class="profile-action" @click="pickAvatar('camera')">
+					<text class="profile-action-text">{{ t('profile.camera') }}</text>
+					<image class="chevron" src="/static/icons/ui-right-light.png" />
+				</view>
+				<view class="divider pref-divider"></view>
+				<view class="profile-action" @click="pickAvatar('album')">
+					<text class="profile-action-text">{{ t('profile.album') }}</text>
+					<image class="chevron" src="/static/icons/ui-right-light.png" />
+				</view>
+				<view v-if="session.avatar.length > 0 || session.avatarUrl.length > 0">
+					<view class="divider pref-divider"></view>
+					<view class="profile-action" @click="removeAvatar">
+						<text class="profile-action-text profile-action-danger">{{ t('profile.remove') }}</text>
+					</view>
+				</view>
+				<view class="sheet-bottom"></view>
+			</view>
+		</view>
+
+		<view v-if="mediaConsentOpen" class="modal-mask modal-mask-center">
+			<view class="dialog">
+				<text class="dialog-title">{{ t('profile.mediaTitle') }}</text>
+				<text class="dialog-msg">{{ t('profile.mediaMsg') }}</text>
+				<view class="row dialog-actions">
+					<view class="dialog-btn dialog-btn-ghost" @click="denyMediaConsent">
+						<text class="dialog-btn-ghost-text">{{ t('common.cancel') }}</text>
+					</view>
+					<view class="dialog-btn dialog-btn-mint" @click="agreeMediaConsent">
+						<text class="dialog-btn-mint-text">{{ t('profile.mediaAgree') }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+
+		<view v-if="nameOpen" class="modal-mask modal-mask-center">
+			<view class="dialog">
+				<text class="dialog-title">{{ t('profile.nameTitle') }}</text>
+				<text class="dialog-msg">{{ t('profile.nameHint') }}</text>
+				<input
+					class="name-input"
+					type="text"
+					:value="nameDraft"
+					:maxlength="16"
+					:placeholder="t('profile.namePlaceholder')"
+					placeholder-class="name-placeholder"
+					@input="onNameInput"
+				/>
+				<view class="row dialog-actions">
+					<view class="dialog-btn dialog-btn-ghost" @click="closeNameDialog">
+						<text class="dialog-btn-ghost-text">{{ t('common.cancel') }}</text>
+					</view>
+					<view class="dialog-btn dialog-btn-mint" @click="confirmName">
+						<text class="dialog-btn-mint-text">{{ t('common.save') }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+
+		<view v-if="logoutOpen" class="modal-mask modal-mask-center">
+			<view class="dialog">
+				<text class="dialog-title">{{ t('settings.logoutTitle') }}</text>
+				<text class="dialog-msg">{{ t('settings.logoutMsg') }}</text>
+				<view class="row dialog-actions">
+					<view class="dialog-btn dialog-btn-ghost" @click="closeLogout">
+						<text class="dialog-btn-ghost-text">{{ t('common.cancel') }}</text>
+					</view>
+					<view class="dialog-btn dialog-btn-danger" @click="confirmLogout">
+						<text class="dialog-btn-danger-text">{{ t('settings.logout') }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	import { computed, ref } from 'vue'
+	import AuroraBg from '@/components/aurora-bg.uvue'
+	import { t } from '@/i18n/index.uts'
+	import { prefs, setLocale, setBaseCurrency, setNotifyWechat } from '@/stores/prefs.uts'
+	import { session, applyProfile, resolveAvatar, clearSession, displayName } from '@/stores/session.uts'
+	import { cloudUpdateProfile } from '@/services/cloud.uts'
+	import {
+		ledger,
+		ensureLoaded,
+		loadLedger,
+		resetLedger,
+		syncSettings,
+		syncSubscription
+	} from '@/stores/ledger.uts'
+	import { CURRENCIES, currencyByCode, currencyName } from '@/constants/currencies.uts'
+	import { CurrencyDef } from '@/types/models.uts'
+	import { APP_VERSION, SUBSCRIBE_TEMPLATE_ID } from '@/constants/config.uts'
+
+	const sheetOpen = ref(false)
+	const logoutOpen = ref(false)
+	const refreshing = ref(false)
+	const avatarSheetOpen = ref(false)
+	const nameOpen = ref(false)
+	const nameDraft = ref('')
+	const savingProfile = ref(false)
+	const mediaConsentOpen = ref(false)
+	const pendingSource = ref('')
+	const MEDIA_CONSENT_KEY = 'mint_media_consent_v1'
+
+	onPageShow(() => {
+		if (!session.isLoggedIn) {
+			uni.reLaunch({
+				url: '/pages/login/login'
+			})
+			return
+		}
+		ensureLoaded()
+	})
+
+	const userName = computed(() : string => {
+		return displayName(prefs.locale)
+	})
+
+	const avatarLetter = computed(() : string => {
+		const name = userName.value
+		if (name.length == 0) return 'M'
+		return name.substring(0, 1).toUpperCase()
+	})
+
+	const accountLabel = computed(() : string => {
+		// #ifdef WEB
+		return t('settings.demoMode')
+		// #endif
+		// #ifndef WEB
+		return t('settings.wechatLinked')
+		// #endif
+	})
+
+	const sessionLabel = computed(() : string => {
+		if (session.userId.length > 0) {
+			return t('settings.synced')
+		}
+		return t('settings.localOnly')
+	})
+
+	const baseSymbol = computed(() : string => {
+		return currencyByCode(prefs.baseCurrency).symbol
+	})
+
+	const baseCurrencyName = computed(() : string => {
+		return currencyName(prefs.baseCurrency, prefs.locale)
+	})
+
+	const currencies = computed<Array<CurrencyDef>>(() => {
+		return CURRENCIES
+	})
+
+	function goBack() : void {
+		uni.navigateBack()
+	}
+
+	function chooseLocale(next : string) : void {
+		if (prefs.locale == next) return
+		setLocale(next)
+		syncSettings()
+	}
+
+	function openCurrencySheet() : void {
+		sheetOpen.value = true
+	}
+
+	function closeCurrencySheet() : void {
+		sheetOpen.value = false
+	}
+
+	function chooseBaseCurrency(code : string) : void {
+		sheetOpen.value = false
+		if (prefs.baseCurrency == code) return
+		setBaseCurrency(code)
+		syncSettings()
+		uni.showToast({
+			title: t('settings.currencyChanged'),
+			icon: 'none'
+		})
+	}
+
+	function openRates() : void {
+		uni.navigateTo({
+			url: '/pages/rates/rates'
+		})
+	}
+
+	function openAvatarSheet() : void {
+		if (savingProfile.value) return
+		avatarSheetOpen.value = true
+	}
+
+	function closeAvatarSheet() : void {
+		avatarSheetOpen.value = false
+	}
+
+	function openNameDialog() : void {
+		if (savingProfile.value) return
+		nameDraft.value = session.nickname
+		nameOpen.value = true
+	}
+
+	function closeNameDialog() : void {
+		nameOpen.value = false
+	}
+
+	function onNameInput(event : UniInputEvent) : void {
+		nameDraft.value = event.detail.value
+	}
+
+	function pickAvatar(source : string) : void {
+		if (savingProfile.value) return
+		avatarSheetOpen.value = false
+		if (!hasMediaConsent()) {
+			pendingSource.value = source
+			mediaConsentOpen.value = true
+			return
+		}
+		proceedAvatar(source)
+	}
+
+	function hasMediaConsent() : boolean {
+		const value = uni.getStorageSync(MEDIA_CONSENT_KEY)
+		return typeof value == 'string' && (value as string) == '1'
+	}
+
+	function agreeMediaConsent() : void {
+		uni.setStorageSync(MEDIA_CONSENT_KEY, '1')
+		mediaConsentOpen.value = false
+		const source = pendingSource.value
+		pendingSource.value = ''
+		if (source.length > 0) {
+			proceedAvatar(source)
+		}
+	}
+
+	function denyMediaConsent() : void {
+		mediaConsentOpen.value = false
+		pendingSource.value = ''
+		uni.showToast({
+			title: t('profile.mediaDenied'),
+			icon: 'none'
+		})
+	}
+
+	function proceedAvatar(source : string) : void {
+		// #ifdef MP-WEIXIN
+		uni.getPrivacySetting({
+			success: (res) => {
+				const needAuth = res.needAuthorization as boolean
+				const contract = res.privacyContractName
+				const contractName = typeof contract == 'string' ? (contract as string) : ''
+				console.log('[mint privacy] needAuthorization=' + (needAuth ? 'true' : 'false') + ' contract=' + contractName)
+				if (needAuth) {
+					wx.requirePrivacyAuthorize({
+						success: () => {
+							openImagePicker(source)
+						},
+						fail: (err) => {
+							console.log('[mint privacy] requirePrivacyAuthorize failed: ' + JSON.stringify(err))
+							uni.showToast({
+								title: t('profile.privacyDenied'),
+								icon: 'none'
+							})
+						}
+					})
+				} else {
+					openImagePicker(source)
+				}
+			},
+			fail: (err) => {
+				console.log('[mint privacy] getPrivacySetting failed: ' + JSON.stringify(err))
+				openImagePicker(source)
+			}
+		})
+		// #endif
+		// #ifndef MP-WEIXIN
+		openImagePicker(source)
+		// #endif
+	}
+
+	function openImagePicker(source : string) : void {
+		uni.chooseImage({
+			count: 1,
+			sizeType: ['compressed'],
+			sourceType: [source],
+			success: (res) => {
+				const paths = res.tempFilePaths
+				if (paths.length > 0) {
+					uploadAvatar(paths[0])
+				}
+			},
+			fail: (err) => {
+				if (err.errMsg.indexOf('cancel') > -1) return
+				uni.showModal({
+					title: t('profile.permissionTitle'),
+					content: t('profile.permissionMsg'),
+					confirmText: t('profile.openSettings'),
+					cancelText: t('common.cancel'),
+					success: (res) => {
+						if (!res.confirm) return
+						// #ifdef MP-WEIXIN
+						uni.openAppAuthorizeSetting({})
+						// #endif
+					}
+				})
+			}
+		})
+	}
+
+	async function uploadAvatar(filePath : string) : Promise<void> {
+		if (savingProfile.value) return
+		savingProfile.value = true
+		uni.showLoading({
+			title: t('profile.uploading'),
+			mask: true
+		})
+		let ok = false
+		try {
+			if (session.token == 'demo-token') {
+				session.avatar = filePath
+				session.avatarUrl = filePath
+				ok = true
+			} else {
+				let ext = 'jpg'
+				const dot = filePath.lastIndexOf('.')
+				if (dot > 0) {
+					const found = filePath.substring(dot + 1).toLowerCase()
+					if (found == 'png' || found == 'jpeg' || found == 'jpg' || found == 'webp') {
+						ext = found
+					}
+				}
+				const cloudPath = 'mint/avatars/' + session.userId + '-' + Date.now() + '.' + ext
+				const upload : any = await uniCloud.uploadFile({
+					filePath: filePath,
+					cloudPath: cloudPath
+				})
+				const fileID = upload.fileID as string
+				if (fileID.length == 0) throw new Error('UPLOAD_FAILED')
+				const user = await cloudUpdateProfile(session.nickname, fileID)
+				applyProfile(user.nickname, user.avatar)
+				await resolveAvatar()
+				ok = true
+			}
+		} catch (e) {
+			ok = false
+		}
+		uni.hideLoading()
+		savingProfile.value = false
+		uni.showToast({
+			title: ok ? t('profile.avatarSaved') : t('profile.saveFailed'),
+			icon: 'none'
+		})
+	}
+
+	async function removeAvatar() : Promise<void> {
+		avatarSheetOpen.value = false
+		if (savingProfile.value) return
+		savingProfile.value = true
+		const previousAvatar = session.avatar
+		const previousUrl = session.avatarUrl
+		applyProfile(session.nickname, '')
+		let ok = false
+		try {
+			if (session.token != 'demo-token') {
+				const user = await cloudUpdateProfile(session.nickname, '')
+				applyProfile(user.nickname, user.avatar)
+			}
+			ok = true
+		} catch (e) {
+			applyProfile(session.nickname, previousAvatar)
+			session.avatarUrl = previousUrl
+		}
+		savingProfile.value = false
+		uni.showToast({
+			title: ok ? t('profile.avatarRemoved') : t('profile.saveFailed'),
+			icon: 'none'
+		})
+	}
+
+	async function confirmName() : Promise<void> {
+		const next = nameDraft.value.trim()
+		if (next.length == 0 || next.length > 16) {
+			uni.showToast({
+				title: t('profile.nameInvalid'),
+				icon: 'none'
+			})
+			return
+		}
+		if (next == session.nickname) {
+			nameOpen.value = false
+			return
+		}
+		nameOpen.value = false
+		if (savingProfile.value) return
+		savingProfile.value = true
+		const previous = session.nickname
+		applyProfile(next, session.avatar)
+		let ok = false
+		try {
+			if (session.token != 'demo-token') {
+				const user = await cloudUpdateProfile(next, session.avatar)
+				applyProfile(user.nickname, user.avatar)
+			}
+			ok = true
+		} catch (e) {
+			applyProfile(previous, session.avatar)
+		}
+		savingProfile.value = false
+		uni.showToast({
+			title: ok ? t('profile.nameSaved') : t('profile.saveFailed'),
+			icon: 'none'
+		})
+	}
+
+	function toggleNotify() : void {
+		if (prefs.notifyWechat) {
+			setNotifyWechat(false)
+			syncSettings()
+			if (SUBSCRIBE_TEMPLATE_ID.length > 0) {
+				syncSubscription(SUBSCRIBE_TEMPLATE_ID, false)
+			}
+			uni.showToast({
+				title: t('settings.notifyOff'),
+				icon: 'none'
+			})
+			return
+		}
+		// #ifdef MP-WEIXIN
+		if (SUBSCRIBE_TEMPLATE_ID.length == 0) {
+			uni.showModal({
+				title: t('settings.templateMissing'),
+				content: t('settings.templateMissingMsg'),
+				showCancel: false
+			})
+			return
+		}
+		const ids : Array<string> = [SUBSCRIBE_TEMPLATE_ID]
+		wx.requestSubscribeMessage({
+			tmplIds: ids,
+			success: (res) => {
+				const payload = JSON.parse<UTSJSONObject>(JSON.stringify(res))
+				const answer = payload == null ? null : payload.getString(SUBSCRIBE_TEMPLATE_ID)
+				const accepted = answer == 'accept'
+				setNotifyWechat(accepted)
+				syncSettings()
+				if (accepted) {
+					syncSubscription(SUBSCRIBE_TEMPLATE_ID, true)
+				}
+				uni.showToast({
+					title: accepted ? t('settings.notifyOn') : t('settings.notifyDenied'),
+					icon: 'none'
+				})
+			},
+			fail: (_ : UniError) => {
+				uni.showToast({
+					title: t('settings.notifyDenied'),
+					icon: 'none'
+				})
+			}
+		})
+		// #endif
+		// #ifndef MP-WEIXIN
+		uni.showToast({
+			title: t('settings.notifyNeedsMp'),
+			icon: 'none'
+		})
+		// #endif
+	}
+
+	async function syncNow() : Promise<void> {
+		if (refreshing.value) return
+		refreshing.value = true
+		await loadLedger(true)
+		refreshing.value = false
+		uni.showToast({
+			title: ledger.error.length > 0 ? t('settings.refreshFailed') : t('settings.refreshed'),
+			icon: 'none'
+		})
+	}
+
+	function askLogout() : void {
+		logoutOpen.value = true
+	}
+
+	function closeLogout() : void {
+		logoutOpen.value = false
+	}
+
+	function confirmLogout() : void {
+		logoutOpen.value = false
+		clearSession()
+		resetLedger()
+		uni.reLaunch({
+			url: '/pages/login/login'
+		})
+	}
+</script>
+
+<style>
+	.topbar {
+		padding-top: 2px;
+		padding-bottom: 2px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.back-btn {
+		width: 38px;
+		height: 38px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+		margin-right: 12px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.12);
+	}
+
+	.head-left {
+		flex-direction: column;
+	}
+
+	.page-title {
+		font-size: 27px;
+		font-weight: 800;
+		letter-spacing: -0.8px;
+		color: #F2F6F1;
+	}
+
+	.page-sub {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		margin-top: 5px;
+	}
+
+	.version-pill {
+		height: 26px;
+		border-radius: 13px;
+		background-color: rgba(255,255,255,0.06);
+		padding-left: 10px;
+		padding-right: 10px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+	}
+
+	.version-pill-text {
+		font-size: 9px;
+		font-weight: 600;
+		color: rgba(234,242,237,0.55);
+	}
+
+	.profile-card {
+		margin-top: 18px;
+		padding: 18px;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.profile-orb {
+		position: absolute;
+		width: 150px;
+		height: 150px;
+		border-radius: 75px;
+		background-color: rgba(123,231,191,0.08);
+		right: -52px;
+		top: -62px;
+	}
+
+	.profile-head {
+		position: relative;
+	}
+
+	.avatar-big {
+		width: 56px;
+		height: 56px;
+		border-radius: 18px;
+		background-color: #A9EDCB;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+	}
+
+	.avatar-big-letter {
+		font-size: 22px;
+		font-weight: 800;
+		color: #0B2117;
+	}
+
+	.avatar-wrap {
+		position: relative;
+		width: 56px;
+		height: 56px;
+	}
+
+	.avatar-big-image {
+		width: 56px;
+		height: 56px;
+	}
+
+	.avatar-badge {
+		position: absolute;
+		right: -3px;
+		bottom: -3px;
+		width: 20px;
+		height: 20px;
+		border-radius: 10px;
+		background-color: #A9EDCB;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 0 0 2px #101712;
+	}
+
+	.avatar-badge-icon {
+		width: 11px;
+		height: 11px;
+	}
+
+	.profile-edit {
+		width: 14px;
+		height: 14px;
+		margin-left: 7px;
+		opacity: 0.52;
+	}
+
+	.profile-action {
+		height: 50px;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		padding-left: 4px;
+		padding-right: 4px;
+	}
+
+	.profile-action-text {
+		font-size: 15px;
+		font-weight: 600;
+		color: #F2F6F1;
+	}
+
+	.profile-action-danger {
+		color: #FF9C8F;
+	}
+
+	.name-input {
+		height: 46px;
+		margin-top: 14px;
+		padding-left: 14px;
+		padding-right: 14px;
+		border-radius: 14px;
+		background-color: rgba(255,255,255,0.06);
+		color: #F2F6F1;
+		font-size: 16px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+	}
+
+	.name-placeholder {
+		color: rgba(234,242,237,0.34);
+	}
+
+	.profile-main {
+		margin-left: 13px;
+		flex-direction: column;
+	}
+
+	.profile-name {
+		font-size: 19px;
+		font-weight: 800;
+		letter-spacing: -0.3px;
+		color: #F2F6F1;
+	}
+
+	.profile-status-row {
+		margin-top: 5px;
+	}
+
+	.status-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 3px;
+		background-color: #3F8F6C;
+		margin-right: 5px;
+	}
+
+	.profile-status {
+		font-size: 10px;
+		color: rgba(234,242,237,0.56);
+	}
+
+	.member-pill {
+		height: 24px;
+		border-radius: 12px;
+		background-color: rgba(123,231,191,0.12);
+		padding-left: 9px;
+		padding-right: 9px;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.16);
+	}
+
+	.member-pill-text {
+		font-size: 9px;
+		font-weight: 650;
+		color: #8FE3BC;
+	}
+
+	.profile-divider {
+		margin-top: 15px;
+	}
+
+	.profile-foot {
+		margin-top: 12px;
+	}
+
+	.cloud-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 3px;
+		background-color: #B9CFC1;
+		margin-right: 6px;
+	}
+
+	.profile-foot-text {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+	}
+
+	.profile-foot-code {
+		font-size: 9px;
+		color: rgba(234,242,237,0.30);
+	}
+
+	.section-header {
+		margin-top: 20px;
+		margin-bottom: 9px;
+		padding-left: 4px;
+	}
+
+	.section-title {
+		font-size: 15px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.prefs-card {
+		padding: 4px 16px;
+	}
+
+	.pref-row {
+		flex-direction: row;
+		align-items: center;
+		padding-top: 13px;
+		padding-bottom: 13px;
+	}
+
+	.pref-icon {
+		width: 36px;
+		height: 36px;
+		border-radius: 12px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+		margin-right: 11px;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.10);
+	}
+
+	.pref-main {
+		flex-direction: column;
+		margin-right: 8px;
+	}
+
+	.pref-title {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.pref-sub {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+		line-height: 14px;
+	}
+
+	.pref-value {
+		font-size: 10px;
+		color: rgba(234,242,237,0.56);
+		margin-right: 5px;
+	}
+
+	.chevron {
+		width: 12px;
+		height: 12px;
+		opacity: 0.35;
+	}
+
+	.pref-divider {
+		margin-left: 47px;
+	}
+
+	.seg {
+		height: 30px;
+		border-radius: 15px;
+		background-color: rgba(255,255,255,0.08);
+		padding: 3px;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.seg-item {
+		height: 24px;
+		border-radius: 12px;
+		padding-left: 9px;
+		padding-right: 9px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.seg-item-active {
+		background-color: rgba(123,231,191,0.16);
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.22);
+	}
+
+	.seg-text {
+		font-size: 10px;
+		font-weight: 600;
+		color: rgba(234,242,237,0.56);
+	}
+
+	.seg-text-active {
+		color: #A9EDCB;
+		font-weight: 700;
+	}
+
+	.toggle {
+		width: 42px;
+		height: 24px;
+		border-radius: 12px;
+		background-color: rgba(255,255,255,0.10);
+		padding: 3px;
+		flex-direction: row;
+		align-items: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10);
+	}
+
+	.toggle-on {
+		background-color: #6FD9A9;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+	}
+
+	.knob {
+		width: 18px;
+		height: 18px;
+		border-radius: 9px;
+		background-color: #F4F1E9;
+		box-shadow: 0 2px 5px rgba(0,0,0,0.28);
+	}
+
+	.knob-on {
+		margin-left: 18px;
+	}
+
+	.refresh-icon {
+		width: 30px;
+		height: 30px;
+		border-radius: 10px;
+		background-color: rgba(123,231,191,0.12);
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(169,237,203,0.16);
+	}
+
+	.refresh-glyph {
+		opacity: 0.6;
+	}
+
+	.spinning {
+		opacity: 0.5;
+	}
+
+	.about-card {
+		padding: 18px;
+	}
+
+	.about-main {
+		margin-left: 12px;
+		flex-direction: column;
+	}
+
+	.about-name {
+		font-size: 17px;
+		font-weight: 800;
+		letter-spacing: -0.3px;
+		color: #F2F6F1;
+	}
+
+	.about-version {
+		font-size: 9px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 3px;
+	}
+
+	.about-badge {
+		width: 32px;
+		height: 32px;
+		border-radius: 11px;
+		background-color: rgba(240,160,106,0.12);
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(240,160,106,0.16);
+	}
+
+	.about-badge-icon {
+		width: 16px;
+		height: 16px;
+		opacity: 0.8;
+	}
+
+	.about-text {
+		font-size: 11px;
+		color: rgba(234,242,237,0.55);
+		line-height: 18px;
+		margin-top: 14px;
+	}
+
+	.about-divider {
+		margin-top: 14px;
+	}
+
+	.about-thanks {
+		font-size: 10px;
+		color: rgba(234,242,237,0.32);
+		margin-top: 12px;
+	}
+
+	.logout-row {
+		height: 52px;
+		margin-top: 16px;
+		border-radius: 16px;
+		background-color: rgba(240,110,86,0.12);
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(240,110,86,0.16);
+	}
+
+	.logout-icon {
+		width: 16px;
+		height: 16px;
+		opacity: 0.7;
+	}
+
+	.logout-text {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F08A70;
+		margin-left: 7px;
+	}
+
+	.bottom-space {
+		height: 36px;
+	}
+
+	.currency-sheet {
+		padding-left: 18px;
+		padding-right: 18px;
+	}
+
+	.sheet-title {
+		font-size: 19px;
+		font-weight: 800;
+		color: #F2F6F1;
+	}
+
+	.sheet-sub {
+		font-size: 10px;
+		color: rgba(234,242,237,0.42);
+		line-height: 15px;
+		margin-top: 5px;
+		margin-bottom: 8px;
+	}
+
+	.currency-item {
+		flex-direction: row;
+		align-items: center;
+		padding-top: 10px;
+		padding-bottom: 10px;
+	}
+
+	.currency-tile {
+		width: 38px;
+		height: 38px;
+		border-radius: 12px;
+		background-color: rgba(255,255,255,0.06);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.currency-tile-active {
+		background-color: #A9EDCB;
+	}
+
+	.currency-symbol {
+		font-size: 14px;
+		font-weight: 750;
+		color: rgba(234,242,237,0.55);
+	}
+
+	.currency-symbol-active {
+		color: #0B2117;
+	}
+
+	.currency-main {
+		margin-left: 12px;
+		flex-direction: column;
+	}
+
+	.currency-name {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.currency-code {
+		font-size: 10px;
+		color: rgba(234,242,237,0.42);
+		margin-top: 2px;
+	}
+
+	.currency-check {
+		width: 26px;
+		height: 26px;
+		border-radius: 13px;
+		background-color: rgba(255,255,255,0.07);
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10);
+	}
+
+	.sheet-bottom {
+		height: 10px;
+	}
+
+	.dialog-title {
+		font-size: 17px;
+		font-weight: 750;
+		color: #F2F6F1;
+	}
+
+	.dialog-msg {
+		font-size: 12px;
+		color: rgba(234,242,237,0.56);
+		line-height: 19px;
+		margin-top: 8px;
+	}
+
+	.dialog-actions {
+		margin-top: 20px;
+	}
+
+	.dialog-btn {
+		flex: 1;
+		height: 46px;
+		border-radius: 14px;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dialog-btn-ghost {
+		background-color: rgba(255,255,255,0.06);
+	}
+
+	.dialog-btn-ghost-text {
+		font-size: 13px;
+		font-weight: 650;
+		color: #F2F6F1;
+	}
+
+	.dialog-btn-mint {
+		background-color: #A9EDCB;
+		background-image: linear-gradient(160deg, #D6F8E6 0%, #A9EDCB 52%, #8FE3BC 100%);
+		margin-left: 10px;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 18px rgba(143,227,188,0.24);
+	}
+
+	.dialog-btn-mint-text {
+		font-size: 13px;
+		font-weight: 750;
+		color: #0B2117;
+	}
+
+	.dialog-btn-danger {
+		background-color: rgba(240,110,86,0.12);
+		margin-left: 10px;
+	}
+
+	.dialog-btn-danger-text {
+		font-size: 13px;
+		font-weight: 700;
+		color: #F08A70;
+	}
+
+	.loading-text {
+		font-size: 12px;
+		color: rgba(234,242,237,0.46);
+		margin-top: 14px;
+	}
+</style>

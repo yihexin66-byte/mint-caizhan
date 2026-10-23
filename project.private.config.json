@@ -1,0 +1,14 @@
+{
+  "libVersion": "3.17.4",
+  "projectname": "Mint%20%E4%B8%AA%E4%BA%BA%E8%B4%A2%E5%8A%A1%E7%AE%A1%E5%AE%B6",
+  "setting": {
+    "urlCheck": false,
+    "coverView": true,
+    "lazyloadPlaceholderEnable": false,
+    "skylineRenderEnable": false,
+    "preloadBackgroundData": false,
+    "autoAudits": false,
+    "showShadowRootInWxmlPanel": true,
+    "compileHotReLoad": true
+  }
+}

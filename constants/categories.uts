@@ -1,0 +1,57 @@
+import { CategoryDef } from '@/types/models.uts'
+
+export const CATEGORY_ALL = 'all'
+export const CATEGORY_OTHER_EXPENSE = 'other_expense'
+export const CATEGORY_OTHER_INCOME = 'other_income'
+export const CATEGORY_DEBT_PAY = 'debt_pay'
+export const CATEGORY_DEBT_RECEIVE = 'debt_receive'
+
+export const EXPENSE_CATEGORIES : Array<CategoryDef> = [
+	{ id: 'food', nameZh: '餐饮', nameEn: 'Food', icon: 'food', color: '#D8844B', type: 'expense' },
+	{ id: 'transport', nameZh: '交通', nameEn: 'Transport', icon: 'transport', color: '#6A96BD', type: 'expense' },
+	{ id: 'shopping', nameZh: '购物', nameEn: 'Shopping', icon: 'shopping', color: '#C8798E', type: 'expense' },
+	{ id: 'bills', nameZh: '账单', nameEn: 'Bills', icon: 'bills', color: '#9487B5', type: 'expense' },
+	{ id: 'entertainment', nameZh: '娱乐', nameEn: 'Fun', icon: 'entertainment', color: '#5EA88B', type: 'expense' },
+	{ id: 'health', nameZh: '健康', nameEn: 'Health', icon: 'health', color: '#CC7969', type: 'expense' },
+	{ id: 'education', nameZh: '学习', nameEn: 'Learning', icon: 'education', color: '#74A08F', type: 'expense' },
+	{ id: 'living', nameZh: '居住', nameEn: 'Living', icon: 'living', color: '#B99557', type: 'expense' },
+	{ id: 'gift', nameZh: '礼物', nameEn: 'Gifts', icon: 'gift', color: '#BC7597', type: 'expense' },
+	{ id: 'travel', nameZh: '旅行', nameEn: 'Travel', icon: 'travel', color: '#61A9B1', type: 'expense' },
+	{ id: 'other_expense', nameZh: '其他', nameEn: 'Other', icon: 'other', color: '#908B81', type: 'expense' },
+	{ id: 'debt_pay', nameZh: '还欠款', nameEn: 'Debt paid', icon: 'debt', color: '#B1835F', type: 'expense' }
+]
+
+export const INCOME_CATEGORIES : Array<CategoryDef> = [
+	{ id: 'salary', nameZh: '工资', nameEn: 'Salary', icon: 'salary', color: '#4F9B73', type: 'income' },
+	{ id: 'bonus', nameZh: '奖金', nameEn: 'Bonus', icon: 'bonus', color: '#CD9A45', type: 'income' },
+	{ id: 'invest', nameZh: '理财', nameEn: 'Invest', icon: 'invest', color: '#698FC6', type: 'income' },
+	{ id: 'other_income', nameZh: '其他收入', nameEn: 'Other', icon: 'other', color: '#8C877D', type: 'income' },
+	{ id: 'debt_receive', nameZh: '收回欠款', nameEn: 'Debt received', icon: 'settlement', color: '#4E9B7C', type: 'income' }
+]
+
+export function categoriesOf(type : string) : Array<CategoryDef> {
+	return type == 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+}
+
+export function categoryById(id : string) : CategoryDef {
+	for (let i = 0; i < EXPENSE_CATEGORIES.length; i++) {
+		if (EXPENSE_CATEGORIES[i].id == id) {
+			return EXPENSE_CATEGORIES[i]
+		}
+	}
+	for (let i = 0; i < INCOME_CATEGORIES.length; i++) {
+		if (INCOME_CATEGORIES[i].id == id) {
+			return INCOME_CATEGORIES[i]
+		}
+	}
+	return EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 2]
+}
+
+export function categoryName(id : string, locale : string) : string {
+	const item = categoryById(id)
+	return locale == 'en' ? item.nameEn : item.nameZh
+}
+
+export function categoryIconPath(id : string) : string {
+	return '/static/icons/cat-' + categoryById(id).icon + '.png'
+}

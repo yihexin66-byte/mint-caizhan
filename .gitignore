@@ -1,0 +1,17 @@
+unpackage/
+.DS_Store
+.hbuilderx/
+
+# 本地云端密钥配置：从 config.example.js 复制后填写，只留在本机，永不入库
+uniCloud-alipay/cloudfunctions/*/config.js
+
+# 依赖与 QA 产物（截图/日志体积大，只保留可复跑的脚本）
+node_modules/
+_qa/devtools-config-backup/
+_qa/*.png
+_qa/*.jpg
+_qa/*.jpeg
+_qa/*.webp
+_qa/*.webm
+_qa/*.mp4
+_qa/*.log
